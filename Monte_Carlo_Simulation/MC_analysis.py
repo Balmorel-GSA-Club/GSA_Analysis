@@ -5,9 +5,9 @@ YEAR = '2030'
 
 Nordics = ['DENMARK', 'NORWAY', 'SWEDEN', 'FINLAND']
 
-MainResults_path = f"../0 DATA/MainResults_{YEAR}.gdx"
+MainResults_path = f"../DATA/MainResults_{YEAR}.gdx"
 MainResults_path = os.path.abspath(MainResults_path)
-MonteCarlo_path = f"../0 DATA/MonteCarlo_DK_{YEAR}.gdx"
+MonteCarlo_path = f"../DATA/MonteCarlo_DK_{YEAR}.gdx"
 MonteCarlo_path = os.path.abspath(MonteCarlo_path)
 
 def Main_Analysis(MainResults_path, MonteCarlo_path, YEAR, Countries_from, Countries_to) :
