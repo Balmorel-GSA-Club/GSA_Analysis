@@ -1,0 +1,600 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import gams.transfer as gt
+import pybalmorel as pyb
+import gams
+import os
+import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+
+#### Main Results functions ####
+
+# Function to import the table from the MainResults file
+def Import_MainResults(file_path) :
+    
+    df = gt.Container(file_path)
+    df_PRO = pd.DataFrame(df.data["PRO_YCRAGF"].records)
+    df_CAP = pd.DataFrame(df.data["G_CAP_YCRAF"].records)
+    df_XH2_CAP = pd.DataFrame(df.data["XH2_CAP_YCR"].records)
+    df_XH2_FLOW = pd.DataFrame(df.data["XH2_FLOW_YCR"].records)
+    
+    return df_PRO, df_CAP, df_XH2_CAP, df_XH2_FLOW
+
+# Function to extract the info about the hydrogen capacities
+def H2_CAP(df_CAP, Countries: list[str], YEAR) :
+    if not isinstance(Countries, list):
+        raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries).__name__}.")
+    
+    #HYDROGEN CAPACITY 
+    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR)]
+    #GREEN HYDROGEN CAPACITY
+    df_H2_CAP_GREEN = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='ELECTROLYZER')]
+    df_H2_CAP_GREEN_tot = df_H2_CAP_GREEN['value'].sum()
+    #BLUE HYDROGEN CAPACITY
+    df_H2_CAP_BLUE = df_H2_CAP[(df_H2_CAP['G'].str.contains('CCS')) & ((df_H2_CAP['TECH_TYPE']=='STEAMREFORMING'))]
+    df_H2_CAP_BLUE_tot = df_H2_CAP_BLUE['value'].sum()
+    #STO HYDROGEN CAPACITY
+    df_H2_CAP_STO = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='H2-STORAGE')]
+    df_H2_CAP_STO_tot = df_H2_CAP_STO['value'].sum()
+    
+    return df_H2_CAP, df_H2_CAP_GREEN, df_H2_CAP_GREEN_tot, df_H2_CAP_BLUE, df_H2_CAP_BLUE_tot, df_H2_CAP_STO, df_H2_CAP_STO_tot
+
+# Function to extract the info about the hydrogen production
+def H2_PRO(df_PRO, df_CAP, Countries: list[str], YEAR) :
+    if not isinstance(Countries, list):
+        raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries).__name__}.")
+    
+    #HYDROGEN CAPACITY 
+    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR)]
+    #HYDROGEN PRODUCTION 
+    df_H2_PRO = df_PRO[(df_PRO['COMMODITY']=='HYDROGEN') & (df_PRO['C'].isin(Countries)) & (df_PRO['Y']==YEAR)]
+    #GREEN HYDROGEN PRODUCTION
+    df_H2_PRO_GREEN = df_H2_PRO[(df_H2_PRO['TECH_TYPE']=='ELECTROLYZER')]
+    df_H2_PRO_GREEN_tot = df_H2_PRO_GREEN['value'].sum()
+    #BLUE HYDROGEN PRODUCTION
+    df_H2_PRO_BLUE = df_H2_PRO[(df_H2_PRO['G'].str.contains('CCS')) & ((df_H2_PRO['TECH_TYPE']=='STEAMREFORMING'))]
+    df_H2_PRO_BLUE_tot = df_H2_PRO_BLUE['value'].sum()
+    #STO HYDROGEN PRODUCTION
+    df_H2_PRO_STO = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='H2-STORAGE')]
+    def apply_factor(row):
+        if 'GNR_H2S_H2-TNKC_Y' in row['G']:
+            return row['value'] * 0.5 /1000
+        elif 'GNR_H2S_H2-CAVERN_Y' in row['G']:
+            return row['value'] * 180 /1000
+        else:
+            return row['value']
+    df_H2_PRO_STO['adjusted_value'] = df_H2_PRO_STO.apply(apply_factor, axis=1)
+    df_H2_PRO_STO_tot = df_H2_PRO_STO['adjusted_value'].sum()
+    
+    return df_H2_PRO, df_H2_PRO_GREEN, df_H2_PRO_GREEN_tot, df_H2_PRO_BLUE, df_H2_PRO_BLUE_tot, df_H2_PRO_STO, df_H2_PRO_STO_tot
+
+RRR_to_CCC = {
+    'DK1': 'DENMARK','DK2': 'DENMARK','FIN': 'FINLAND','NO1': 'NORWAY','NO2': 'NORWAY','NO3': 'NORWAY','NO4': 'NORWAY','NO5': 'NORWAY','SE1': 'SWEDEN',
+    'SE2': 'SWEDEN', 'SE3': 'SWEDEN','SE4': 'SWEDEN','UK': 'UNITED_KINGDOM','EE': 'ESTONIA','LV': 'LATVIA','LT': 'LITHUANIA','PL': 'POLAND','BE': 'BELGIUM',
+    'NL': 'NETHERLANDS','DE4-E': 'GERMANY','DE4-N': 'GERMANY','DE4-S': 'GERMANY','DE4-W': 'GERMANY','FR': 'FRANCE','IT': 'ITALY','CH': 'SWITZERLAND',
+    'AT': 'AUSTRIA','CZ': 'CZECH_REPUBLIC','ES': 'SPAIN','PT': 'PORTUGAL','SK': 'SLOVAKIA','HU': 'HUNGARY','SI': 'SLOVENIA','HR': 'CROATIA','RO': 'ROMANIA',
+    'BG': 'BULGARIA','GR': 'GREECE','IE': 'IRELAND','LU': 'LUXEMBOURG','AL': 'ALBANIA','ME': 'MONTENEGRO', 'MK': 'NORTH_MACEDONIA',
+    'BA': 'BOSNIA_AND_HERZEGOVINA','RS': 'SERBIA','TR': 'TURKEY','MT': 'MALTA','CY': 'CYPRUS'
+}
+
+# Function to extract transmission capacities and flows
+def XH2(df_XH2, Countries_from: list[str], Countries_to: list[str], YEAR) :
+    if not isinstance(Countries_from, list):
+        raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries_from).__name__}.")
+    if not isinstance(Countries_to, list):
+        raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries_to).__name__}.")
+    
+    df_XH2 = df_XH2[df_XH2['Y']==YEAR]
+    df_XH2['CI'] = df_XH2['IRRRI'].map(RRR_to_CCC)
+    df_XH2 = df_XH2[(df_XH2['C'].isin(Countries_from))]
+    df_XH2_tot = df_XH2.groupby(['CI'])['value'].sum().reset_index()
+    df_XH2_tot_TO = df_XH2_tot[(df_XH2_tot['CI'].isin(Countries_to))]
+    
+    return df_XH2_tot_TO 
+
+
+
+
+#### Monte Carlo functions ####
+
+# Function to import the tables from the MonteCarlo file
+def Import_MonteCarlo(file_path):
+    
+    df_merged = gt.Container(file_path)
+
+    df_PRO        = pd.DataFrame(df_merged.data["PRO_YCRAGF"].records)
+    df_CAP        = pd.DataFrame(df_merged.data["G_CAP_YCRAF"].records)
+    df_XH2_CAP    = pd.DataFrame(df_merged.data["XH2_CAP_YCR"].records)
+    df_XH2_FLOW   = pd.DataFrame(df_merged.data["XH2_FLOW_YCR"].records)
+
+    PRO_YCRAGF_headers     = ['scenarios', 'Y', 'C', 'RRR', 'AAA', 'G', 'FFF', 'COMMODITY', 'TECH_TYPE', 'UNITS', 'value']
+    G_CAP_YCRAF_headers    = ['scenarios', 'Y', 'C', 'RRR', 'AAA', 'G', 'FFF', 'COMMODITY', 'TECH_TYPE', 'VARIABLE_CATEGORY', 'UNITS', 'value']
+    XH2_CAP_YCR_headers    = ['scenarios', 'Y', 'C', 'IRRRE', 'IRRRI', 'VARIABLE_CATEGORY', 'UNITS', 'value']
+    XH2_FLOW_YCR_headers   = ['scenarios', 'Y', 'C', 'IRRRE', 'IRRRI', 'UNITS', 'value']
+
+    df_PRO.columns       = PRO_YCRAGF_headers
+    df_CAP.columns       = G_CAP_YCRAF_headers
+    df_XH2_CAP.columns   = XH2_CAP_YCR_headers
+    df_XH2_FLOW.columns  = XH2_FLOW_YCR_headers
+
+    #drop na 
+    df_PRO = df_PRO.dropna()
+    df_CAP = df_CAP.dropna()
+    df_XH2_CAP = df_XH2_CAP.dropna()
+    df_XH2_FLOW = df_XH2_FLOW.dropna()
+
+    #remove the word Scenario from the scenario column
+    df_PRO['scenarios'] = df_PRO['scenarios'].str.extract(r'(\d+)').astype(int)
+    df_CAP['scenarios'] = df_CAP['scenarios'].str.extract(r'(\d+)').astype(int)
+    df_XH2_CAP['scenarios'] = df_XH2_CAP['scenarios'].str.extract(r'(\d+)').astype(int)
+    df_XH2_FLOW['scenarios'] = df_XH2_FLOW['scenarios'].str.extract(r'(\d+)').astype(int)
+
+    scen = pd.unique(df_PRO['scenarios']).tolist()
+
+    return df_PRO, df_CAP, df_XH2_CAP, df_XH2_FLOW, scen
+
+# Function to extract hydrogen capacities for specific countries
+def H2_CAP_scen(df_CAP, scen, Countries: list[str], YEAR):
+    if not isinstance(Countries, list):
+        raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries).__name__}.")
+    
+    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR)]
+    df_H2_CAP_GREEN = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='ELECTROLYZER')]
+    df_H2_CAP_BLUE = df_H2_CAP[(df_H2_CAP['G'].str.contains('CCS')) & ((df_H2_CAP['TECH_TYPE']=='STEAMREFORMING'))]
+    df_H2_CAP_STO = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='H2-STORAGE')]
+
+    df_H2_CAP_GREEN = df_H2_CAP_GREEN.groupby('scenarios')['value'].sum().reset_index()
+    df_H2_CAP_BLUE  = df_H2_CAP_BLUE.groupby('scenarios')['value'].sum().reset_index()
+    df_H2_CAP_STO   = df_H2_CAP_STO.groupby('scenarios')['value'].sum().reset_index()
+
+    df_H2_CAP_GREEN = df_H2_CAP_GREEN.sort_values(by=['scenarios'],ascending=True)
+    df_H2_CAP_BLUE  = df_H2_CAP_BLUE.sort_values(by=['scenarios'],ascending=True)
+    df_H2_CAP_STO   = df_H2_CAP_STO.sort_values(by=['scenarios'],ascending=True)
+
+    df_H2_CAP_GREEN = df_H2_CAP_GREEN.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    df_H2_CAP_BLUE  = df_H2_CAP_BLUE.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    df_H2_CAP_STO   = df_H2_CAP_STO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+
+    return df_H2_CAP, df_H2_CAP_GREEN, df_H2_CAP_BLUE, df_H2_CAP_STO
+
+# Function to extract hydrogen production for specific countries
+def H2_PRO_scen(df_PRO, df_CAP, scen, Countries: list[str], YEAR):
+    if not isinstance(Countries, list):
+        raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries).__name__}.")
+    
+    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR)]
+    df_H2_PRO = df_PRO[(df_PRO['COMMODITY']=='HYDROGEN') & (df_PRO['C'].isin(Countries)) & (df_PRO['Y']==YEAR)]
+    
+    df_H2_PRO_GREEN = df_H2_PRO[(df_H2_PRO['TECH_TYPE']=='ELECTROLYZER')]
+    df_H2_PRO_BLUE = df_H2_PRO[(df_H2_PRO['G'].str.contains('CCS')) & ((df_H2_PRO['TECH_TYPE']=='STEAMREFORMING'))]
+    
+    df_H2_PRO_GREEN = df_H2_PRO_GREEN.groupby('scenarios')['value'].sum().reset_index()
+    df_H2_PRO_BLUE  = df_H2_PRO_BLUE.groupby('scenarios')['value'].sum().reset_index()
+
+    df_H2_PRO_GREEN = df_H2_PRO_GREEN.sort_values(by=['scenarios'],ascending=True)
+    df_H2_PRO_BLUE  = df_H2_PRO_BLUE.sort_values(by=['scenarios'],ascending=True)
+
+    df_H2_PRO_GREEN = df_H2_PRO_GREEN.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    df_H2_PRO_BLUE  = df_H2_PRO_BLUE.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    
+    df_H2_PRO_STO = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='H2-STORAGE')]    
+    df_H2_PRO_STO['factor'] = df_H2_PRO_STO['G'].apply(lambda g: 0.5 if 'H2-TNKC' in g else (180 if 'H2-CAVERN' in g else 1))
+    df_H2_PRO_STO = df_H2_PRO_STO.groupby('scenarios').apply(lambda x: (x['value'] * x['factor']/1000).sum()).reset_index(name='value')
+    df_H2_PRO_STO = df_H2_PRO_STO.sort_values(by='scenarios', ascending=True)
+    df_H2_PRO_STO = df_H2_PRO_STO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+
+    return df_H2_PRO, df_H2_PRO_GREEN, df_H2_PRO_BLUE, df_H2_PRO_STO
+
+# Function to extract transmission capacities and flows
+def XH2_scen(df_XH2, scen, Countries_from: list[str], Countries_to: list[str], YEAR):
+    if not isinstance(Countries_from, list):
+        raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries_from).__name__}.")
+    if not isinstance(Countries_to, list):
+        raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries_to).__name__}.")
+    
+    df_XH2 = df_XH2[df_XH2['Y']==YEAR]
+    df_XH2['CI'] = df_XH2['IRRRI'].map(RRR_to_CCC)
+    df_XH2 = df_XH2[(df_XH2['C'].isin(Countries_from))]
+    df_XH2_tot = df_XH2.groupby(['scenarios','CI'])['value'].sum().reset_index()
+    df_XH2_tot_TO = df_XH2_tot[(df_XH2_tot['CI'].isin(Countries_to))]
+
+    df_XH2_tot_TO = df_XH2_tot_TO.groupby('scenarios').sum().reset_index()
+    df_XH2_tot_TO = df_XH2_tot_TO.sort_values(by=['scenarios'],ascending=True)
+    df_XH2_tot_TO = df_XH2_tot_TO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+
+    df_XH2_tot = df_XH2_tot.drop(columns=['CI'])
+    df_XH2_tot_TO = df_XH2_tot_TO.drop(columns=['CI'], errors='ignore')
+
+    return df_XH2_tot, df_XH2_tot_TO
+
+
+#### Plotting functions ####
+
+# Function to plot ECDF and Histograms for hydrogen production
+def ECDF_Hist_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df_H2_PRO_GREEN_tot_BASE, df_H2_PRO_BLUE_tot_BASE, df_H2_PRO_STO_tot_BASE, geography, YEAR) :
+    data_green = df_H2_PRO_GREEN_scen['value']
+    data_blue = df_H2_PRO_BLUE_scen['value']
+    data_sto = df_H2_PRO_STO_scen['value']
+
+    sorted_data_blue = np.sort(data_blue)
+    sorted_data_green = np.sort(data_green)
+    sorted_data_sto = np.sort(data_sto)
+
+    ecdf_blue = np.arange(1, len(sorted_data_blue) + 1) / len(sorted_data_blue)
+    ecdf_green = np.arange(1, len(sorted_data_green) + 1) / len(sorted_data_green)
+    ecdf_sto = np.arange(1, len(sorted_data_sto) + 1) / len(sorted_data_sto)
+
+    # Create subplots
+    fig = make_subplots(rows=1, cols=3, specs=[[{"secondary_y": True}, {"secondary_y": True}, {"secondary_y": True}]], horizontal_spacing=0.07)
+
+    # Plotting Green Data ECDF and Histogram
+    fig.add_trace(go.Scatter(x=sorted_data_green, y=ecdf_green, mode='lines', name='Green ECDF', line=dict(color='green')), row=1, col=1, secondary_y=False)
+    fig.add_trace(go.Histogram(x=data_green, name='Green Histogram', marker_color='lightgreen', opacity=0.8), row=1, col=1, secondary_y=True)
+    # Add vertical line for Green baseline
+    fig.add_shape(type="line", xref="x", yref="paper", x0=df_H2_PRO_GREEN_tot_BASE, y0=0, x1=df_H2_PRO_GREEN_tot_BASE, y1=1, line=dict(color="green", width=2, dash="dash"), row=1, col=1)
+    # Dummy trace for Green baseline line in legend
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', line=dict(color='green', width=2, dash='dash'), name='Green Baseline'), row=1, col=1)
+
+    # Plotting Blue Data ECDF and Histogram
+    fig.add_trace(go.Scatter(x=sorted_data_blue, y=ecdf_blue, mode='lines', name='Blue ECDF', line=dict(color='blue')), row=1, col=2, secondary_y=False)
+    fig.add_trace(go.Histogram(x=data_blue, name='Blue Histogram', marker_color='lightblue', opacity=0.8), row=1, col=2, secondary_y=True)
+    # Add vertical line for Blue baseline
+    fig.add_shape(type="line", xref="x", yref="paper", x0=df_H2_PRO_BLUE_tot_BASE, y0=0, x1=df_H2_PRO_BLUE_tot_BASE, y1=1, line=dict(color="blue", width=2, dash="dash"), row=1, col=2)
+    # Dummy trace for Blue baseline line in legend
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', line=dict(color='blue', width=2, dash='dash'), name='Blue Baseline'), row=1, col=2)
+
+    # Plotting Storage Data ECDF and Histogram
+    fig.add_trace(go.Scatter(x=sorted_data_sto, y=ecdf_sto, mode='lines', name='Storage ECDF', line=dict(color='orange')), row=1, col=3, secondary_y=False)
+    fig.add_trace(go.Histogram(x=data_sto, name='Storage Histogram', marker_color='orange', opacity=0.8), row=1, col=3, secondary_y=True)
+    # Add vertical line for Storage baseline
+    fig.add_shape(type="line", xref="x", yref="paper", x0=df_H2_PRO_STO_tot_BASE, y0=0, x1=df_H2_PRO_STO_tot_BASE, y1=1, line=dict(color="darkorange", width=2, dash="dash"), row=1, col=3)
+    # Dummy trace for Storage baseline line in legend
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', line=dict(color='darkorange', width=2, dash='dash'), name='Storage Baseline'), row=1, col=3)
+
+    annotations = [
+        dict(xref='paper', yref='paper', x=0.5, y=-0.15, xanchor='center', yanchor='top', text='Hydrogen Production [TWh]', showarrow=False, font=dict(size=15)),
+        dict(xref='paper', yref='paper', x=-0.03, y=0.5, xanchor='right', yanchor='middle', text='ECDF', showarrow=False, font=dict(size=15), textangle=-90),
+        dict(xref='paper', yref='paper', x=0.97, y=0.5, xanchor='left', yanchor='middle', text='Frequency', showarrow=False, font=dict(size=15), textangle=-90)
+    ]
+
+    # Update layout with custom axis titles and overall figure adjustments
+    fig.update_layout(
+        title=f'ECDF Plots and Histograms for Hydrogen Production in {geography} ({YEAR})',
+        width=1350,
+        height=500,
+        annotations=annotations,
+        legend=dict(x=0.5, y=1.1, xanchor='center', yanchor='top', orientation='h',font=dict(size=11))
+    )
+
+    # Show the figure
+    fig.show()
+
+    return(fig)
+    
+# Function to plot ECDF and Histograms for hydrogen capacity
+def ECDF_Hist_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_GREEN_tot_BASE, df_H2_CAP_BLUE_tot_BASE, geography, YEAR) :
+    data_green = df_H2_CAP_GREEN_scen['value']
+    data_blue = df_H2_CAP_BLUE_scen['value']
+
+    sorted_data_blue = np.sort(data_blue)
+    sorted_data_green = np.sort(data_green)
+
+    ecdf_blue = np.arange(1, len(sorted_data_blue) + 1) / len(sorted_data_blue)
+    ecdf_green = np.arange(1, len(sorted_data_green) + 1) / len(sorted_data_green)
+
+    # Create subplots
+    fig = make_subplots(rows=1, cols=2, specs=[[{"secondary_y": True}, {"secondary_y": True}]], horizontal_spacing=0.09)
+
+    # Plotting Green Data ECDF and Histogram
+    fig.add_trace(go.Scatter(x=sorted_data_green, y=ecdf_green, mode='lines', name='Green ECDF', line=dict(color='green')), row=1, col=1, secondary_y=False)
+    fig.add_trace(go.Histogram(x=data_green, name='Green Histogram', marker_color='lightgreen', opacity=0.8), row=1, col=1, secondary_y=True)
+    # Add vertical line for Green baseline
+    fig.add_shape(type="line", xref="x", yref="paper", x0=df_H2_CAP_GREEN_tot_BASE, y0=0, x1=df_H2_CAP_GREEN_tot_BASE, y1=1, line=dict(color="green", width=2, dash="dash"), row=1, col=1)
+
+    # Dummy trace for Green baseline line in legend
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', line=dict(color='green', width=2, dash='dash'), name='Green Baseline'), row=1, col=1)
+
+    # Plotting Blue Data ECDF and Histogram
+    fig.add_trace(go.Scatter(x=sorted_data_blue, y=ecdf_blue, mode='lines', name='Blue ECDF', line=dict(color='blue')), row=1, col=2, secondary_y=False)
+    fig.add_trace(go.Histogram(x=data_blue, name='Blue Histogram', marker_color='lightblue', opacity=0.8), row=1, col=2, secondary_y=True)
+    # Add vertical line for Blue baseline
+    fig.add_shape(type="line", xref="x", yref="paper", x0=df_H2_CAP_BLUE_tot_BASE, y0=0, x1=df_H2_CAP_BLUE_tot_BASE, y1=1, line=dict(color="blue", width=2, dash="dash"), row=1, col=2)
+
+    # Dummy trace for Blue baseline line in legend
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode='lines', line=dict(color='blue', width=2, dash='dash'), name='Blue Baseline'), row=1, col=2)
+
+    annotations = [
+        dict(xref='paper', yref='paper', x=0.5, y=-0.15, xanchor='center', yanchor='top', text='Hydrogen Capacity [GW]', showarrow=False, font=dict(size=15)),
+        dict(xref='paper', yref='paper', x=-0.03, y=0.5, xanchor='right', yanchor='middle', text='ECDF', showarrow=False, font=dict(size=15), textangle=-90),
+    ]
+
+    # Update layout with custom axis titles and overall figure adjustments
+    fig.update_layout(
+        title=f'ECDF Plots and Histograms for Hydrogen Capacity in {geography} ({YEAR})',
+        width=1000,
+        height=500,
+        annotations=annotations,
+        legend=dict(x=0.5, y=1.1, xanchor='center', yanchor='top', orientation='h',font=dict(size=11))
+    )
+
+    fig.show()
+
+    return(fig)
+    
+# Function to violin plot the distribution of H2 production
+def Violin_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df_H2_PRO_GREEN_tot_BASE, df_H2_PRO_BLUE_tot_BASE, df_H2_PRO_STO_tot_BASE, geography, YEAR) :
+    # Example DataFrames and baseline values (ensure these dataframes and variables are defined)
+    baseline_y = np.array([df_H2_PRO_GREEN_tot_BASE, df_H2_PRO_BLUE_tot_BASE, df_H2_PRO_STO_tot_BASE])
+    categories = ['Green H2', 'Blue H2', 'Storage H2']
+
+    df_H2_PRO_GREEN_scen['category'] = 'Green H2'
+    df_H2_PRO_BLUE_scen['category'] = 'Blue H2'
+    df_H2_PRO_STO_scen['category'] = 'Storage H2'
+
+    # Apply the threshold to the Blue H2 data only
+    #threshold = 5
+    #df_H2_PRO_DK_BLUE_N1000 = df_H2_PRO_DK_BLUE_N1000[df_H2_PRO_DK_BLUE_N1000['value'] < threshold]
+
+    # Combine the dataframes into a single dataframe
+    combined_df = pd.concat([df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen])
+
+    # Create subplots
+    fig = make_subplots(rows=1, cols=3)
+
+    # Plot Green H2
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Green H2']['value'], name='Green H2',
+                            box_visible=True, line_color='green'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=['Green H2'], y=[baseline_y[0]], mode='markers',
+                            marker=dict(color='#a5eb34', size=10), name='Baseline Green H2'), row=1, col=1)
+
+    # Plot Blue H2
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Blue H2']['value'], name='Blue H2',
+                            box_visible=True, line_color='blue'), row=1, col=2)
+    fig.add_trace(go.Scatter(x=['Blue H2'], y=[baseline_y[1]], mode='markers',
+                            marker=dict(color='#34ebe5', size=10), name='Baseline Blue H2'), row=1, col=2)
+
+    # Plot Storage H2
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Storage H2']['value'], name='Storage H2',
+                            box_visible=True, line_color='orange'), row=1, col=3)
+    fig.add_trace(go.Scatter(x=['Storage H2'], y=[baseline_y[2]], mode='markers',
+                            marker=dict(color='#eb4034', size=10), name='Baseline Storage H2'), row=1, col=3)
+    # Update y axes
+    # fig.update_yaxes(range=[0,40],row=1,col=1)
+    # fig.update_yaxes(range=[0,10],row=1,col=2)
+    # fig.update_yaxes(range=[0,1.8],row=1,col=3)
+    # Adjust layout with the legend below the title and above the plots
+    fig.update_layout(
+        title={
+            'text': f'Violin Plot: Value Distribution of H2 Production in {geography} ({YEAR})',
+            'font': {'size': 16}
+        },
+        yaxis_title="H2 Production [TWh]",
+        yaxis2_title="H2 Production [TWh]",
+        yaxis3_title="H2 Storage [TWh]",
+        height=600,
+        width=1200,
+        legend=dict(orientation='h', x=0.5, y=1.04, xanchor='center', yanchor='bottom'),  # Adjust legend position
+        margin=dict(t=120, b=100)  # Adjust top and bottom margins to accommodate title and legend
+    )
+
+    # Show the figure
+    fig.show()
+
+    return(fig)
+    
+# Function to violin plot the distribution of H2 capacities
+def Violin_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_STO_scen, df_H2_CAP_GREEN_tot_BASE, df_H2_CAP_BLUE_tot_BASE, df_H2_CAP_STO_tot_BASE, geography, YEAR) :
+    
+    baseline_y = np.array([df_H2_CAP_GREEN_tot_BASE, df_H2_CAP_BLUE_tot_BASE, df_H2_CAP_STO_tot_BASE])
+    categories = ['Green H2', 'Blue H2', 'Storage H2']
+
+    # Assigning categories
+    df_H2_CAP_GREEN_scen['category'] = 'Green H2'
+    df_H2_CAP_BLUE_scen['category'] = 'Blue H2'
+    df_H2_CAP_STO_scen['category'] = 'Storage H2'
+
+    #threshold = 0.2
+    #df_H2_CAP_DK_BLUE_N1000 = df_H2_CAP_DK_BLUE_N1000[df_H2_CAP_DK_BLUE_N1000['value'] < threshold]
+
+    # Combine the dataframes into one dataframe
+    combined_df = pd.concat([df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_STO_scen])
+
+    # Create subplots with 1 row and 3 columns
+    fig = make_subplots(rows=1, cols=2)
+
+    # Add violin plots to each subplot
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Green H2']['value'], name='Green H2',
+                            line_color='green', box_visible=True, meanline_visible=False), row=1, col=1)
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Blue H2']['value'], name='Blue H2',
+                            line_color='blue', box_visible=True, meanline_visible=False), row=1, col=2)
+    # fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Storage H2']['value'], name='Storage H2',
+    #                         line_color='orange', box_visible=True, meanline_visible=True), row=1, col=3)
+
+    # Add baseline markers for each category
+    fig.add_trace(go.Scatter(x=['Green H2'], y=[baseline_y[0]], mode='markers',
+                            marker=dict(color='#a5eb34', size=10), name='Baseline Green H2'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=['Blue H2'], y=[baseline_y[1]], mode='markers',
+                            marker=dict(color='#34ebe5', size=10), name='Baseline Blue H2'), row=1, col=2)
+    # fig.add_trace(go.Scatter(x=['Storage H2'], y=[baseline_y[2]], mode='markers',
+    #                          marker=dict(color='#eb4034', size=10), name='Baseline Storage H2'), row=1, col=3)
+    #Update y-axes
+    # fig.update_yaxes(range=[0,1],row=1,col=2)
+    # Adjust layout
+    fig.update_layout(
+        title=f'Violin Plot: Value Distribution of H2 Capacity in {geography} ({YEAR})',
+        yaxis_title="H2 Capacity [GW]",
+        yaxis2_title="H2 Capacity [GW]",
+        height=600,
+        width=1200,
+        showlegend=False  # Optionally hide the legend if it is not needed
+    )
+
+    # Show the figure
+    fig.show()
+
+    return(fig)
+    
+# Function for box plot of transmission capacities 
+def BoxPlot_CAP(dict_df_XH2_CAP_TO_BASE, dict_df_XH2_CAP_TO_scen, geography, YEAR) :
+    
+    dict_BASE = dict_df_XH2_CAP_TO_BASE.copy()
+    dict_scen = dict_df_XH2_CAP_TO_scen.copy()
+    
+    # Get the keys of the dict
+    keys = list(dict_df_XH2_CAP_TO_BASE.keys())
+    
+    baseline_y = np.array([dict_BASE[key]['value'].sum() for key in keys])
+    means_y = np.array([dict_BASE[key]['value'].mean() for key in keys])
+    
+    # Combine the data into one DataFrame with an additional 'category' column
+    L = []
+    for key in keys :
+        df = dict_scen[key].copy()
+        df['category'] = key
+        L.append(df)
+    
+    combined_df = pd.concat(L)
+
+    # Create the box plot using go.Box to control width
+    fig = go.Figure()
+
+    # Define colors for each category
+    colors = {'CE': 'green', 'GERMANY': 'blue', 'NETHERLANDS': 'orange', 'SWEDEN': 'red', 'ESTONIA': 'purple'}
+
+
+    # Add box plots for each category
+    for category in keys:
+        fig.add_trace(go.Box(
+            x=combined_df[combined_df['category'] == category]['value'],
+            name=category,
+            marker_color=colors[category],
+            # boxmean='sd',
+            width=0.15  # Adjust the width of the box plots
+        ))
+
+    # Define darker colors for the baseline markers
+    darker_colors = {'CE': '#a5eb34',  # Dark green
+                    'GERMANY': '#34ebe5',  # Dark blue
+                    'NETHERLANDS': '#eb4034',  # Darker yellow (like olive)
+                    'SWEDEN': '#8B0000',
+                    'ESTONIA': '#66023C'}  # Darker red 
+
+    # Add baseline markers
+    for i, baseline in enumerate(baseline_y):
+        fig.add_trace(go.Scatter(y=[keys[i]], x=[baseline],
+                                mode='markers', marker=dict(color=darker_colors[keys[i]], size=8, symbol='circle'),
+                                name=f'Baseline {keys[i]}'))
+
+    # Add mean markers
+    for i, means in enumerate(means_y):
+        fig.add_trace(go.Scatter(y=[keys[i]], x=[means],
+                                mode='markers', marker=dict(color=darker_colors[keys[i]], size=8, symbol='x'),
+                                name=f'Mean {keys[i]}'))
+
+    # Adjust layout
+    fig.update_layout(
+        title={
+            'text': f'Box Plot: H2 Transmission Capacity between {geography} and Neighboring Countries ({YEAR})',
+            'font': {'size': 15}
+            },
+        yaxis_title="Neighboring Countries",
+        xaxis_title="H2 Transmission Capacity [GW]",
+        height=500,
+        width=900,
+        margin=dict(
+            l=50,
+            r=50,
+            t=100,
+            b=100)
+            )
+
+    # Show the figure
+    fig.show()
+
+    return(fig)
+
+# Function for box plot of transmission capacities 
+def BoxPlot_FLOW(dict_df_XH2_FLOW_TO_BASE, dict_df_XH2_FLOW_TO_scen, geography, YEAR) :
+    
+    dict_BASE = dict_df_XH2_FLOW_TO_BASE.copy()
+    dict_scen = dict_df_XH2_FLOW_TO_scen.copy()
+    
+    # Get the keys of the dict
+    keys = list(dict_df_XH2_FLOW_TO_BASE.keys())
+    
+    baseline_y = np.array([dict_BASE[key]['value'].sum() for key in keys])
+    means_y = np.array([dict_BASE[key]['value'].mean() for key in keys])
+    
+    # Combine the data into one DataFrame with an additional 'category' column
+    L = []
+    for key in keys :
+        df = dict_scen[key].copy()
+        df['category'] = key
+        L.append(df)
+    
+    combined_df = pd.concat(L)
+
+    # Create the box plot using go.Box to control width
+    fig = go.Figure()
+
+    # Define colors for each category
+    colors = {'CE': 'green', 'GERMANY': 'blue', 'NETHERLANDS': 'orange', 'SWEDEN': 'red', 'ESTONIA': 'purple'}
+
+
+    # Add box plots for each category
+    for category in keys:
+        fig.add_trace(go.Box(
+            x=combined_df[combined_df['category'] == category]['value'],
+            name=category,
+            marker_color=colors[category],
+            # boxmean='sd',
+            width=0.15  # Adjust the width of the box plots
+        ))
+
+    # Define darker colors for the baseline markers
+    darker_colors = {'CE': '#a5eb34',  # Dark green
+                    'GERMANY': '#34ebe5',  # Dark blue
+                    'NETHERLANDS': '#eb4034',  # Darker yellow (like olive)
+                    'SWEDEN': '#8B0000',
+                    'ESTONIA': '#66023C'}  # Darker red 
+
+    # Add baseline markers
+    for i, baseline in enumerate(baseline_y):
+        fig.add_trace(go.Scatter(y=[keys[i]], x=[baseline],
+                                mode='markers', marker=dict(color=darker_colors[keys[i]], size=8, symbol='circle'),
+                                name=f'Baseline {keys[i]}'))
+
+    # Add mean markers
+    for i, means in enumerate(means_y):
+        fig.add_trace(go.Scatter(y=[keys[i]], x=[means],
+                                mode='markers', marker=dict(color=darker_colors[keys[i]], size=8, symbol='x'),
+                                name=f'Mean {keys[i]}'))
+
+    # Adjust layout
+    fig.update_layout(
+        title={
+            'text': f'Box Plot: H2 Transmission Capacity between {geography} and Neighboring Countries ({YEAR})',
+            'font': {'size': 15}
+            },
+        yaxis_title="Neighboring Countries",
+        xaxis_title="H2 Transmission Capacity [GW]",
+        height=500,
+        width=900,
+        margin=dict(
+            l=50,
+            r=50,
+            t=100,
+            b=100)
+            )
+
+    # Show the figure
+    fig.show()
+
+    return(fig)
+    
