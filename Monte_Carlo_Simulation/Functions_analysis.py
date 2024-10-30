@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import gams.transfer as gt
 import pybalmorel as pyb
 import gams
@@ -12,6 +13,24 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
+
+#### Useful dictionnaries #####
+
+RRR_to_CCC = {
+    'DK1': 'DENMARK','DK2': 'DENMARK','FIN': 'FINLAND','NO1': 'NORWAY','NO2': 'NORWAY','NO3': 'NORWAY','NO4': 'NORWAY','NO5': 'NORWAY','SE1': 'SWEDEN',
+    'SE2': 'SWEDEN', 'SE3': 'SWEDEN','SE4': 'SWEDEN','UK': 'UNITED_KINGDOM','EE': 'ESTONIA','LV': 'LATVIA','LT': 'LITHUANIA','PL': 'POLAND','BE': 'BELGIUM',
+    'NL': 'NETHERLANDS','DE4-E': 'GERMANY','DE4-N': 'GERMANY','DE4-S': 'GERMANY','DE4-W': 'GERMANY','FR': 'FRANCE','IT': 'ITALY','CH': 'SWITZERLAND',
+    'AT': 'AUSTRIA','CZ': 'CZECH_REPUBLIC','ES': 'SPAIN','PT': 'PORTUGAL','SK': 'SLOVAKIA','HU': 'HUNGARY','SI': 'SLOVENIA','HR': 'CROATIA','RO': 'ROMANIA',
+    'BG': 'BULGARIA','GR': 'GREECE','IE': 'IRELAND','LU': 'LUXEMBOURG','AL': 'ALBANIA','ME': 'MONTENEGRO', 'MK': 'NORTH_MACEDONIA',
+    'BA': 'BOSNIA_AND_HERZEGOVINA','RS': 'SERBIA','TR': 'TURKEY','MT': 'MALTA','CY': 'CYPRUS'
+}
+
+Regions_name = {
+    ('DENMARK', 'NORWAY', 'SWEDEN', 'FINLAND', 'ESTONIA', 'LATVIA', 'LITHUANIA') : 'Northern Europe',
+    ('FRANCE', 'GERMANY', 'NETHERLANDS', 'UNITED-KINGDOM', 'BELGIUM', 'LUXEMBOURG', 'AUSTRIA', 'SWITZERLAND', 'IRELAND') : 'Western Europe',
+    ('POLAND', 'CZECH_REPUBLIC', 'SLOVAKIA', 'ROMANIA', 'BULGARIA', 'HUNGARY') : 'Eastern Europe',
+    ('ITALY', 'SPAIN', 'PORTUGAL', 'SLOVENIA', 'CROATIA', 'ALBANIA', 'MALTA', 'CYPRUS', 'BOSNIA_AND_HERZEGOVINA', 'MONTENEGRO', 'NORTH_MACEDONIA', 'SERBIA', 'GREECE') : 'Southern Europe'
+}
 
 #### Main Results functions ####
 
@@ -74,29 +93,21 @@ def H2_PRO(df_PRO, df_CAP, Countries: list[str], YEAR) :
     
     return df_H2_PRO, df_H2_PRO_GREEN, df_H2_PRO_GREEN_tot, df_H2_PRO_BLUE, df_H2_PRO_BLUE_tot, df_H2_PRO_STO, df_H2_PRO_STO_tot
 
-RRR_to_CCC = {
-    'DK1': 'DENMARK','DK2': 'DENMARK','FIN': 'FINLAND','NO1': 'NORWAY','NO2': 'NORWAY','NO3': 'NORWAY','NO4': 'NORWAY','NO5': 'NORWAY','SE1': 'SWEDEN',
-    'SE2': 'SWEDEN', 'SE3': 'SWEDEN','SE4': 'SWEDEN','UK': 'UNITED_KINGDOM','EE': 'ESTONIA','LV': 'LATVIA','LT': 'LITHUANIA','PL': 'POLAND','BE': 'BELGIUM',
-    'NL': 'NETHERLANDS','DE4-E': 'GERMANY','DE4-N': 'GERMANY','DE4-S': 'GERMANY','DE4-W': 'GERMANY','FR': 'FRANCE','IT': 'ITALY','CH': 'SWITZERLAND',
-    'AT': 'AUSTRIA','CZ': 'CZECH_REPUBLIC','ES': 'SPAIN','PT': 'PORTUGAL','SK': 'SLOVAKIA','HU': 'HUNGARY','SI': 'SLOVENIA','HR': 'CROATIA','RO': 'ROMANIA',
-    'BG': 'BULGARIA','GR': 'GREECE','IE': 'IRELAND','LU': 'LUXEMBOURG','AL': 'ALBANIA','ME': 'MONTENEGRO', 'MK': 'NORTH_MACEDONIA',
-    'BA': 'BOSNIA_AND_HERZEGOVINA','RS': 'SERBIA','TR': 'TURKEY','MT': 'MALTA','CY': 'CYPRUS'
-}
-
 # Function to extract transmission capacities and flows
-def XH2(df_XH2, Countries_from: list[str], Countries_to: list[str], YEAR) :
+def XH2(df_XH2, Countries_from: list[str], YEAR) :
     if not isinstance(Countries_from, list):
         raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries_from).__name__}.")
-    if not isinstance(Countries_to, list):
-        raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries_to).__name__}.")
     
     df_XH2 = df_XH2[df_XH2['Y']==YEAR]
     df_XH2['CI'] = df_XH2['IRRRI'].map(RRR_to_CCC)
     df_XH2 = df_XH2[(df_XH2['C'].isin(Countries_from))]
     df_XH2_tot = df_XH2.groupby(['CI'])['value'].sum().reset_index()
-    df_XH2_tot_TO = df_XH2_tot[(df_XH2_tot['CI'].isin(Countries_to))]
+    Countries_to = df_XH2_tot['CI'].unique()
+    dict_df_XH2_TO = {}
+    for country in Countries_to :
+        dict_df_XH2_TO[country] = df_XH2_tot[(df_XH2_tot['CI'].isin([country]))]
     
-    return df_XH2_tot_TO 
+    return dict_df_XH2_TO
 
 
 
@@ -192,32 +203,33 @@ def H2_PRO_scen(df_PRO, df_CAP, scen, Countries: list[str], YEAR):
     return df_H2_PRO, df_H2_PRO_GREEN, df_H2_PRO_BLUE, df_H2_PRO_STO
 
 # Function to extract transmission capacities and flows
-def XH2_scen(df_XH2, scen, Countries_from: list[str], Countries_to: list[str], YEAR):
+def XH2_scen(df_XH2, scen, Countries_from: list[str], YEAR):
     if not isinstance(Countries_from, list):
         raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries_from).__name__}.")
-    if not isinstance(Countries_to, list):
-        raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries_to).__name__}.")
     
     df_XH2 = df_XH2[df_XH2['Y']==YEAR]
     df_XH2['CI'] = df_XH2['IRRRI'].map(RRR_to_CCC)
     df_XH2 = df_XH2[(df_XH2['C'].isin(Countries_from))]
     df_XH2_tot = df_XH2.groupby(['scenarios','CI'])['value'].sum().reset_index()
-    df_XH2_tot_TO = df_XH2_tot[(df_XH2_tot['CI'].isin(Countries_to))]
+    Countries_to = df_XH2_tot['CI'].unique()
+    dict_df_XH2_TO_scen = {}
+    for country in Countries_to :
+        df_XH2_tot_TO = df_XH2_tot[(df_XH2_tot['CI'].isin([country]))]
+        df_XH2_tot_TO = df_XH2_tot_TO.groupby('scenarios').sum().reset_index()
+        df_XH2_tot_TO = df_XH2_tot_TO.sort_values(by=['scenarios'],ascending=True)
+        df_XH2_tot_TO = df_XH2_tot_TO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        dict_df_XH2_TO_scen[country] = df_XH2_tot_TO
 
-    df_XH2_tot_TO = df_XH2_tot_TO.groupby('scenarios').sum().reset_index()
-    df_XH2_tot_TO = df_XH2_tot_TO.sort_values(by=['scenarios'],ascending=True)
-    df_XH2_tot_TO = df_XH2_tot_TO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    # df_XH2_tot = df_XH2_tot.drop(columns=['CI'])
+    # df_XH2_tot_TO = df_XH2_tot_TO.drop(columns=['CI'], errors='ignore')
 
-    df_XH2_tot = df_XH2_tot.drop(columns=['CI'])
-    df_XH2_tot_TO = df_XH2_tot_TO.drop(columns=['CI'], errors='ignore')
-
-    return df_XH2_tot, df_XH2_tot_TO
+    return df_XH2_tot, dict_df_XH2_TO_scen
 
 
 #### Plotting functions ####
 
 # Function to plot ECDF and Histograms for hydrogen production
-def ECDF_Hist_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df_H2_PRO_GREEN_tot_BASE, df_H2_PRO_BLUE_tot_BASE, df_H2_PRO_STO_tot_BASE, geography, YEAR) :
+def ECDF_Hist_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df_H2_PRO_GREEN_tot_BASE, df_H2_PRO_BLUE_tot_BASE, df_H2_PRO_STO_tot_BASE, Countries_from: list[str], YEAR) :
     data_green = df_H2_PRO_GREEN_scen['value']
     data_blue = df_H2_PRO_BLUE_scen['value']
     data_sto = df_H2_PRO_STO_scen['value']
@@ -262,10 +274,16 @@ def ECDF_Hist_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen,
         dict(xref='paper', yref='paper', x=-0.03, y=0.5, xanchor='right', yanchor='middle', text='ECDF', showarrow=False, font=dict(size=15), textangle=-90),
         dict(xref='paper', yref='paper', x=0.97, y=0.5, xanchor='left', yanchor='middle', text='Frequency', showarrow=False, font=dict(size=15), textangle=-90)
     ]
+    
+    # Name of the region
+    try : 
+        region_name = Regions_name[tuple(Countries_from)]
+    except :
+        region_name = ' '.join(Countries_from)
 
     # Update layout with custom axis titles and overall figure adjustments
     fig.update_layout(
-        title=f'ECDF Plots and Histograms for Hydrogen Production in {geography} ({YEAR})',
+        title=f'ECDF Plots and Histograms for Hydrogen Production in {region_name} ({YEAR})',
         width=1350,
         height=500,
         annotations=annotations,
@@ -278,7 +296,7 @@ def ECDF_Hist_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen,
     return(fig)
     
 # Function to plot ECDF and Histograms for hydrogen capacity
-def ECDF_Hist_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_GREEN_tot_BASE, df_H2_CAP_BLUE_tot_BASE, geography, YEAR) :
+def ECDF_Hist_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_GREEN_tot_BASE, df_H2_CAP_BLUE_tot_BASE, Countries_from: list[str], YEAR) :
     data_green = df_H2_CAP_GREEN_scen['value']
     data_blue = df_H2_CAP_BLUE_scen['value']
 
@@ -313,10 +331,16 @@ def ECDF_Hist_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_GREEN_tot
         dict(xref='paper', yref='paper', x=0.5, y=-0.15, xanchor='center', yanchor='top', text='Hydrogen Capacity [GW]', showarrow=False, font=dict(size=15)),
         dict(xref='paper', yref='paper', x=-0.03, y=0.5, xanchor='right', yanchor='middle', text='ECDF', showarrow=False, font=dict(size=15), textangle=-90),
     ]
+    
+    # Name of the region
+    try : 
+        region_name = Regions_name[tuple(Countries_from)]
+    except :
+        region_name = ' '.join(Countries_from)
 
     # Update layout with custom axis titles and overall figure adjustments
     fig.update_layout(
-        title=f'ECDF Plots and Histograms for Hydrogen Capacity in {geography} ({YEAR})',
+        title=f'ECDF Plots and Histograms for Hydrogen Capacity in {region_name} ({YEAR})',
         width=1000,
         height=500,
         annotations=annotations,
@@ -328,7 +352,7 @@ def ECDF_Hist_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_GREEN_tot
     return(fig)
     
 # Function to violin plot the distribution of H2 production
-def Violin_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df_H2_PRO_GREEN_tot_BASE, df_H2_PRO_BLUE_tot_BASE, df_H2_PRO_STO_tot_BASE, geography, YEAR) :
+def Violin_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df_H2_PRO_GREEN_tot_BASE, df_H2_PRO_BLUE_tot_BASE, df_H2_PRO_STO_tot_BASE, Countries_from: list[str], YEAR) :
     # Example DataFrames and baseline values (ensure these dataframes and variables are defined)
     baseline_y = np.array([df_H2_PRO_GREEN_tot_BASE, df_H2_PRO_BLUE_tot_BASE, df_H2_PRO_STO_tot_BASE])
     categories = ['Green H2', 'Blue H2', 'Storage H2']
@@ -369,9 +393,16 @@ def Violin_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df
     # fig.update_yaxes(range=[0,10],row=1,col=2)
     # fig.update_yaxes(range=[0,1.8],row=1,col=3)
     # Adjust layout with the legend below the title and above the plots
+   
+    # Name of the region
+    try : 
+        region_name = Regions_name[tuple(Countries_from)]
+    except :
+        region_name = ' '.join(Countries_from) 
+    
     fig.update_layout(
         title={
-            'text': f'Violin Plot: Value Distribution of H2 Production in {geography} ({YEAR})',
+            'text': f'Violin Plot: Value Distribution of H2 Production in {region_name} ({YEAR})',
             'font': {'size': 16}
         },
         yaxis_title="H2 Production [TWh]",
@@ -389,7 +420,7 @@ def Violin_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df
     return(fig)
     
 # Function to violin plot the distribution of H2 capacities
-def Violin_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_STO_scen, df_H2_CAP_GREEN_tot_BASE, df_H2_CAP_BLUE_tot_BASE, df_H2_CAP_STO_tot_BASE, geography, YEAR) :
+def Violin_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_STO_scen, df_H2_CAP_GREEN_tot_BASE, df_H2_CAP_BLUE_tot_BASE, df_H2_CAP_STO_tot_BASE, Countries_from: list[str], YEAR) :
     
     baseline_y = np.array([df_H2_CAP_GREEN_tot_BASE, df_H2_CAP_BLUE_tot_BASE, df_H2_CAP_STO_tot_BASE])
     categories = ['Green H2', 'Blue H2', 'Storage H2']
@@ -426,8 +457,15 @@ def Violin_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_STO_scen, df
     #Update y-axes
     # fig.update_yaxes(range=[0,1],row=1,col=2)
     # Adjust layout
+    
+    # Name of the region
+    try : 
+        region_name = Regions_name[tuple(Countries_from)]
+    except :
+        region_name = ' '.join(Countries_from) 
+    
     fig.update_layout(
-        title=f'Violin Plot: Value Distribution of H2 Capacity in {geography} ({YEAR})',
+        title=f'Violin Plot: Value Distribution of H2 Capacity in {region_name} ({YEAR})',
         yaxis_title="H2 Capacity [GW]",
         yaxis2_title="H2 Capacity [GW]",
         height=600,
@@ -441,20 +479,21 @@ def Violin_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_STO_scen, df
     return(fig)
     
 # Function for box plot of transmission capacities 
-def BoxPlot_CAP(dict_df_XH2_CAP_TO_BASE, dict_df_XH2_CAP_TO_scen, geography, YEAR) :
+def BoxPlot_CAP(dict_df_XH2_CAP_TO_BASE, dict_df_XH2_CAP_TO_scen, Countries_from: list[str], YEAR) :
     
     dict_BASE = dict_df_XH2_CAP_TO_BASE.copy()
     dict_scen = dict_df_XH2_CAP_TO_scen.copy()
     
     # Get the keys of the dict
     keys = list(dict_df_XH2_CAP_TO_BASE.keys())
+    neighbors = [key for key in keys if key not in Countries_from]
     
-    baseline_y = np.array([dict_BASE[key]['value'].sum() for key in keys])
-    means_y = np.array([dict_BASE[key]['value'].mean() for key in keys])
+    baseline_y = np.array([dict_BASE[key]['value'].sum() for key in neighbors])
+    means_y = np.array([dict_BASE[key]['value'].mean() for key in neighbors])
     
     # Combine the data into one DataFrame with an additional 'category' column
     L = []
-    for key in keys :
+    for key in neighbors :
         df = dict_scen[key].copy()
         df['category'] = key
         L.append(df)
@@ -465,42 +504,52 @@ def BoxPlot_CAP(dict_df_XH2_CAP_TO_BASE, dict_df_XH2_CAP_TO_scen, geography, YEA
     fig = go.Figure()
 
     # Define colors for each category
-    colors = {'CE': 'green', 'GERMANY': 'blue', 'NETHERLANDS': 'orange', 'SWEDEN': 'red', 'ESTONIA': 'purple'}
+    # Function to darken a color by a factor
+    def darken_color(color, factor=0.7):
+        rgb = mcolors.to_rgb(color)  # Convert to RGB
+        darkened_rgb = tuple([c * factor for c in rgb])  # Darken by scaling each component
+        return darkened_rgb
 
+    colormap = plt.cm.viridis  # You can use other colormaps like 'plasma', 'coolwarm', etc.
+    num_colors = len(neighbors)
+    base_colors = [colormap(i / num_colors) for i in range(num_colors)]
 
+    # Generate the dictionaries
+    colors_dict = {key: mcolors.to_hex(base_colors[i]) for i, key in enumerate(neighbors)}
+    dark_colors_dict = {key: mcolors.to_hex(darken_color(base_colors[i])) for i, key in enumerate(neighbors)}
+    
     # Add box plots for each category
-    for category in keys:
+    for category in neighbors:
         fig.add_trace(go.Box(
             x=combined_df[combined_df['category'] == category]['value'],
             name=category,
-            marker_color=colors[category],
+            marker_color=colors_dict[category],
             # boxmean='sd',
             width=0.15  # Adjust the width of the box plots
         ))
 
-    # Define darker colors for the baseline markers
-    darker_colors = {'CE': '#a5eb34',  # Dark green
-                    'GERMANY': '#34ebe5',  # Dark blue
-                    'NETHERLANDS': '#eb4034',  # Darker yellow (like olive)
-                    'SWEDEN': '#8B0000',
-                    'ESTONIA': '#66023C'}  # Darker red 
-
     # Add baseline markers
     for i, baseline in enumerate(baseline_y):
-        fig.add_trace(go.Scatter(y=[keys[i]], x=[baseline],
-                                mode='markers', marker=dict(color=darker_colors[keys[i]], size=8, symbol='circle'),
-                                name=f'Baseline {keys[i]}'))
+        fig.add_trace(go.Scatter(y=[neighbors[i]], x=[baseline],
+                                mode='markers', marker=dict(color=colors_dict[neighbors[i]], size=8, symbol='circle'),
+                                name=f'Baseline {neighbors[i]}'))
 
     # Add mean markers
     for i, means in enumerate(means_y):
-        fig.add_trace(go.Scatter(y=[keys[i]], x=[means],
-                                mode='markers', marker=dict(color=darker_colors[keys[i]], size=8, symbol='x'),
-                                name=f'Mean {keys[i]}'))
+        fig.add_trace(go.Scatter(y=[neighbors[i]], x=[means],
+                                mode='markers', marker=dict(color=dark_colors_dict[neighbors[i]], size=8, symbol='x'),
+                                name=f'Mean {neighbors[i]}'))
+
+    # Name of the region
+    try : 
+        region_name = Regions_name[tuple(Countries_from)]
+    except :
+        region_name = ' '.join(Countries_from) 
 
     # Adjust layout
     fig.update_layout(
         title={
-            'text': f'Box Plot: H2 Transmission Capacity between {geography} and Neighboring Countries ({YEAR})',
+            'text': f'Box Plot: H2 Transmission Capacity between {region_name} and Neighboring Countries ({YEAR})',
             'font': {'size': 15}
             },
         yaxis_title="Neighboring Countries",
@@ -520,20 +569,21 @@ def BoxPlot_CAP(dict_df_XH2_CAP_TO_BASE, dict_df_XH2_CAP_TO_scen, geography, YEA
     return(fig)
 
 # Function for box plot of transmission capacities 
-def BoxPlot_FLOW(dict_df_XH2_FLOW_TO_BASE, dict_df_XH2_FLOW_TO_scen, geography, YEAR) :
+def BoxPlot_FLOW(dict_df_XH2_FLOW_TO_BASE, dict_df_XH2_FLOW_TO_scen, Countries_from: list[str], YEAR) :
     
     dict_BASE = dict_df_XH2_FLOW_TO_BASE.copy()
     dict_scen = dict_df_XH2_FLOW_TO_scen.copy()
     
     # Get the keys of the dict
     keys = list(dict_df_XH2_FLOW_TO_BASE.keys())
+    neighbors = [key for key in keys if key not in Countries_from]
     
-    baseline_y = np.array([dict_BASE[key]['value'].sum() for key in keys])
-    means_y = np.array([dict_BASE[key]['value'].mean() for key in keys])
+    baseline_y = np.array([dict_BASE[key]['value'].sum() for key in neighbors])
+    means_y = np.array([dict_BASE[key]['value'].mean() for key in neighbors])
     
     # Combine the data into one DataFrame with an additional 'category' column
     L = []
-    for key in keys :
+    for key in neighbors :
         df = dict_scen[key].copy()
         df['category'] = key
         L.append(df)
@@ -544,46 +594,56 @@ def BoxPlot_FLOW(dict_df_XH2_FLOW_TO_BASE, dict_df_XH2_FLOW_TO_scen, geography, 
     fig = go.Figure()
 
     # Define colors for each category
-    colors = {'CE': 'green', 'GERMANY': 'blue', 'NETHERLANDS': 'orange', 'SWEDEN': 'red', 'ESTONIA': 'purple'}
+    # Function to darken a color by a factor
+    def darken_color(color, factor=0.7):
+        rgb = mcolors.to_rgb(color)  # Convert to RGB
+        darkened_rgb = tuple([c * factor for c in rgb])  # Darken by scaling each component
+        return darkened_rgb
 
+    colormap = plt.cm.viridis  # You can use other colormaps like 'plasma', 'coolwarm', etc.
+    num_colors = len(neighbors)
+    base_colors = [colormap(i / num_colors) for i in range(num_colors)]
+
+    # Generate the dictionaries
+    colors_dict = {key: mcolors.to_hex(base_colors[i]) for i, key in enumerate(neighbors)}
+    dark_colors_dict = {key: mcolors.to_hex(darken_color(base_colors[i])) for i, key in enumerate(neighbors)}
 
     # Add box plots for each category
-    for category in keys:
+    for category in neighbors:
         fig.add_trace(go.Box(
             x=combined_df[combined_df['category'] == category]['value'],
             name=category,
-            marker_color=colors[category],
+            marker_color=colors_dict[category],
             # boxmean='sd',
             width=0.15  # Adjust the width of the box plots
         ))
 
-    # Define darker colors for the baseline markers
-    darker_colors = {'CE': '#a5eb34',  # Dark green
-                    'GERMANY': '#34ebe5',  # Dark blue
-                    'NETHERLANDS': '#eb4034',  # Darker yellow (like olive)
-                    'SWEDEN': '#8B0000',
-                    'ESTONIA': '#66023C'}  # Darker red 
-
     # Add baseline markers
     for i, baseline in enumerate(baseline_y):
-        fig.add_trace(go.Scatter(y=[keys[i]], x=[baseline],
-                                mode='markers', marker=dict(color=darker_colors[keys[i]], size=8, symbol='circle'),
-                                name=f'Baseline {keys[i]}'))
+        fig.add_trace(go.Scatter(y=[neighbors[i]], x=[baseline],
+                                mode='markers', marker=dict(color=colors_dict[neighbors[i]], size=8, symbol='circle'),
+                                name=f'Baseline {neighbors[i]}'))
 
     # Add mean markers
     for i, means in enumerate(means_y):
-        fig.add_trace(go.Scatter(y=[keys[i]], x=[means],
-                                mode='markers', marker=dict(color=darker_colors[keys[i]], size=8, symbol='x'),
-                                name=f'Mean {keys[i]}'))
+        fig.add_trace(go.Scatter(y=[neighbors[i]], x=[means],
+                                mode='markers', marker=dict(color=dark_colors_dict[neighbors[i]], size=8, symbol='x'),
+                                name=f'Mean {neighbors[i]}'))
+
+    # Name of the region
+    try : 
+        region_name = Regions_name[tuple(Countries_from)]
+    except :
+        region_name = ' '.join(Countries_from) 
 
     # Adjust layout
     fig.update_layout(
         title={
-            'text': f'Box Plot: H2 Transmission Capacity between {geography} and Neighboring Countries ({YEAR})',
+            'text': f'Box Plot: H2 Transmission Flow between {region_name} and Neighboring Countries ({YEAR})',
             'font': {'size': 15}
             },
         yaxis_title="Neighboring Countries",
-        xaxis_title="H2 Transmission Capacity [GW]",
+        xaxis_title="H2 Transmission Flow [TWh]",
         height=500,
         width=900,
         margin=dict(
