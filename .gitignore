@@ -1,2 +1,3 @@
 DATA/*
 !DATA/.gitkeep
+**/__pycache__/
