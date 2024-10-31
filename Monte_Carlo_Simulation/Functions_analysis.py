@@ -25,12 +25,40 @@ RRR_to_CCC = {
     'BA': 'BOSNIA_AND_HERZEGOVINA','RS': 'SERBIA','TR': 'TURKEY','MT': 'MALTA','CY': 'CYPRUS'
 }
 
+TECHT_to_TECHG = {
+    'WIND-ON': 'WINDTURBINE_ONSHORE', 'WIND-OFF' : 'WINDTURBINE_OFFSHORE', 'SOLAR-PV' : 'SOLARPV'
+}
+
 Regions_name = {
     ('DENMARK', 'NORWAY', 'SWEDEN', 'FINLAND', 'ESTONIA', 'LATVIA', 'LITHUANIA') : 'Northern Europe',
     ('FRANCE', 'GERMANY', 'NETHERLANDS', 'UNITED-KINGDOM', 'BELGIUM', 'LUXEMBOURG', 'AUSTRIA', 'SWITZERLAND', 'IRELAND') : 'Western Europe',
     ('POLAND', 'CZECH_REPUBLIC', 'SLOVAKIA', 'ROMANIA', 'BULGARIA', 'HUNGARY') : 'Eastern Europe',
     ('ITALY', 'SPAIN', 'PORTUGAL', 'SLOVENIA', 'CROATIA', 'ALBANIA', 'MALTA', 'CYPRUS', 'BOSNIA_AND_HERZEGOVINA', 'MONTENEGRO', 'NORTH_MACEDONIA', 'SERBIA', 'GREECE') : 'Southern Europe'
 }
+
+#### Input Data functions ####
+
+# Function to import the table from the input data file
+def Import_Data(file_path) :
+    
+    df_merged = gt.Container(file_path)
+    df_SUBTECH    = pd.DataFrame(df_merged.data["SUBTECHGROUPKPOT"].records)
+    SUBTECH_headers        = ['scenarios', 'CCCRRRAAA', 'TECH_GROUP', 'SUBTECHGROUP', 'value']
+    df_SUBTECH.columns       = SUBTECH_headers
+    df_SUBTECH = df_SUBTECH.dropna()
+    df_SUBTECH['scenarios'] = df_SUBTECH['scenarios'].str.extract(r'(\d+)').astype(int)
+
+    return df_SUBTECH
+
+def LIM_RE_CAP_scen(df_SUBTECH) :
+    
+    df_SUBTECH['C'] = df_SUBTECH['CCCRRRAAA'].map(RRR_to_CCC)
+    df_RE_SUBTECH = df_SUBTECH.groupby(['scenarios','C','TECH_GROUP'])['value'].sum().reset_index()
+    df_RE_SUBTECH = df_RE_SUBTECH.sort_values(by=['scenarios'],ascending=True)
+    df_RE_SUBTECH['value'] = df_RE_SUBTECH['value']/1000
+    
+    return df_RE_SUBTECH
+
 
 #### Main Results functions ####
 
@@ -150,6 +178,15 @@ def Import_MonteCarlo(file_path):
 
     return df_PRO, df_CAP, df_XH2_CAP, df_XH2_FLOW, scen
 
+def RE_CAP_scen(df_CAP, YEAR) :
+    
+    df_CAP['TECH_GROUP'] = df_CAP['TECH_TYPE'].map(TECHT_to_TECHG)
+    df_CAP = df_CAP[(df_CAP['TECH_GROUP'].isin(['SOLARPV', 'WINDTURBINE_ONSHORE', 'WINDTURBINE_OFFSHORE'])) & (df_CAP['Y']==YEAR)]
+    df_RE_CAP = df_CAP.groupby(['scenarios','C','TECH_GROUP'])['value'].sum().reset_index()
+    df_RE_CAP = df_RE_CAP.sort_values(by=['scenarios'],ascending=True)
+    
+    return df_RE_CAP
+
 # Function to extract hydrogen capacities for specific countries
 def H2_CAP_scen(df_CAP, scen, Countries: list[str], YEAR):
     if not isinstance(Countries, list):
@@ -227,6 +264,70 @@ def XH2_scen(df_XH2, scen, Countries_from: list[str], YEAR):
 
 
 #### Plotting functions ####
+
+# Function to Compare the RE installed capacities to the RE limits
+def COMP_RE_LIM(df_RE_SUBTECH, df_RE_CAP, Countries: list[str], YEAR) :
+    
+    df_RE_SUBTECH = df_RE_SUBTECH[df_RE_SUBTECH['C'].isin(Countries)]
+    df_RE_CAP = df_RE_CAP[df_RE_CAP['C'].isin(Countries)]
+    
+    df_RE_SUBTECH = df_RE_SUBTECH.groupby(['scenarios','TECH_GROUP'])['value'].sum().reset_index()
+    df_RE_CAP = df_RE_CAP.groupby(['scenarios','TECH_GROUP'])['value'].sum().reset_index()
+    
+    df_RE_SUBTECH_WINDON = df_RE_SUBTECH[df_RE_SUBTECH['TECH_GROUP']=='WINDTURBINE_ONSHORE'].reset_index(drop=True)
+    df_RE_SUBTECH_WINDOFF = df_RE_SUBTECH[df_RE_SUBTECH['TECH_GROUP']=='WINDTURBINE_OFFSHORE'].reset_index(drop=True)
+    df_RE_SUBTECH_SOLARPV = df_RE_SUBTECH[df_RE_SUBTECH['TECH_GROUP']=='SOLARPV'].reset_index(drop=True)
+    df_RE_CAP_WINDON = df_RE_CAP[df_RE_CAP['TECH_GROUP']=='WINDTURBINE_ONSHORE'].reset_index(drop=True)
+    df_RE_CAP_WINDOFF = df_RE_CAP[df_RE_CAP['TECH_GROUP']=='WINDTURBINE_OFFSHORE'].reset_index(drop=True)
+    df_RE_CAP_SOLARPV = df_RE_CAP[df_RE_CAP['TECH_GROUP']=='SOLARPV'].reset_index(drop=True)
+    
+    WINDON_RAP = df_RE_CAP_WINDON['value']/df_RE_SUBTECH_WINDON['value']
+    WINDOFF_RAP = df_RE_CAP_WINDOFF['value']/df_RE_SUBTECH_WINDOFF['value']
+    SOLARPV_RAP = df_RE_CAP_SOLARPV['value']/df_RE_SUBTECH_SOLARPV['value']
+    
+    # Create subplots
+    fig = make_subplots(rows=1, cols=3, horizontal_spacing=0.07)
+
+    # Plotting Wind Onshore Histogram
+    fig.add_trace(go.Histogram(x=WINDON_RAP, name='Wind Onshore', marker_color='lightskyblue', opacity=0.8, xbins=dict(start=0, end=1, size=0.01)), row=1, col=1)
+
+    # Plotting Wind Offshore Histogram
+    fig.add_trace(go.Histogram(x=WINDOFF_RAP, name='Wind Offshore', marker_color='darkblue', opacity=0.8, xbins=dict(start=0, end=1, size=0.01)), row=1, col=2)
+
+    # Plotting Solar PV Histogram
+    fig.add_trace(go.Histogram(x=SOLARPV_RAP, name='Solar PV', marker_color='orange', opacity=0.8, xbins=dict(start=0, end=1, size=0.01)), row=1, col=3)
+    
+    #Fix x axis
+    fig.update_xaxes(range=[0, 1], row=1, col=1)
+    fig.update_xaxes(range=[0, 1], row=1, col=2)
+    fig.update_xaxes(range=[0, 1], row=1, col=3)
+
+    annotations = [
+        dict(xref='paper', yref='paper', x=0.5, y=-0.1, xanchor='center', yanchor='top', text='Wind Offshore', showarrow=False, font=dict(size=15)),
+        dict(xref='paper', yref='paper', x=0.125, y=-0.1, xanchor='center', yanchor='top', text='Wind Onshore', showarrow=False, font=dict(size=15)),
+        dict(xref='paper', yref='paper', x=0.875, y=-0.1, xanchor='center', yanchor='top', text='Solar PV', showarrow=False, font=dict(size=15)),
+        dict(xref='paper', yref='paper', x=-0.03, y=0.5, xanchor='right', yanchor='middle', text='Frequency', showarrow=False, font=dict(size=15), textangle=-90)
+    ]
+    
+    # Name of the region
+    try : 
+        region_name = Regions_name[tuple(Countries)]
+    except :
+        region_name = ' '.join(Countries)
+
+    # Update layout with custom axis titles and overall figure adjustments
+    fig.update_layout(
+        title=f'Histograms of Renewables limits in {region_name} ({YEAR})',
+        width=1350,
+        height=500,
+        annotations=annotations,
+        legend=dict(x=0.5, y=1.1, xanchor='center', yanchor='top', orientation='h',font=dict(size=11))
+    )
+
+    # Show the figure
+    fig.show()
+
+    return(fig)
 
 # Function to plot ECDF and Histograms for hydrogen production
 def ECDF_Hist_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df_H2_PRO_GREEN_tot_BASE, df_H2_PRO_BLUE_tot_BASE, df_H2_PRO_STO_tot_BASE, Countries_from: list[str], YEAR) :
