@@ -73,6 +73,17 @@ def Import_MainResults(file_path) :
     
     return df_PRO, df_CAP, df_XH2_CAP, df_XH2_FLOW
 
+# Function to import the CCS table from the MainResults file
+def Import_CCS(file_path, YEAR) :
+   
+    df = gt.Container(file_path)
+    df_CCS = pd.DataFrame(df.data["CC_YCRAG"].records)
+    df_CCS.columns = ["Y", "C", "RRR","AAA", "G", "FFF", "TECH_TYPE", "Units", "Value"]
+    df_CC = df_CCS[df_CCS['Y']==YEAR]
+    yearly_sum = int(df_CC["Value"].sum())
+   
+    return yearly_sum
+
 # Function to extract the info about the hydrogen capacities
 def H2_CAP(df_CAP, Countries: list[str], YEAR) :
     if not isinstance(Countries, list):
