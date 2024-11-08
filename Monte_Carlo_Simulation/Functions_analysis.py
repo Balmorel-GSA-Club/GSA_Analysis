@@ -591,13 +591,15 @@ def Violin_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_STO_scen, df
     return(fig)
     
 # Function for box plot of transmission capacities 
-def BoxPlot_CAP(dict_df_XH2_CAP_TO_BASE, dict_df_XH2_CAP_TO_scen, Countries_from: list[str], YEAR) :
+def BoxPlot_Transmission(dict_df_XH2_TO_BASE, dict_df_XH2_TO_scen, Countries_from: list[str], YEAR, type: str) :
+    if type not in ["Capacity", "Flow"]:
+        raise ValueError(f"Invalid type: {type}. Expected 'Capacity' or 'Flow'.")
     
-    dict_BASE = dict_df_XH2_CAP_TO_BASE.copy()
-    dict_scen = dict_df_XH2_CAP_TO_scen.copy()
+    dict_BASE = dict_df_XH2_TO_BASE.copy()
+    dict_scen = dict_df_XH2_TO_scen.copy()
     
     # Get the keys of the dict
-    keys = list(dict_df_XH2_CAP_TO_BASE.keys())
+    keys = list(dict_df_XH2_TO_BASE.keys())
     neighbors = [key for key in keys if key not in Countries_from]
     
     baseline_y = np.array([dict_BASE[key]['value'].sum() for key in neighbors])
@@ -657,15 +659,23 @@ def BoxPlot_CAP(dict_df_XH2_CAP_TO_BASE, dict_df_XH2_CAP_TO_scen, Countries_from
         region_name = Regions_name[tuple(Countries_from)]
     except :
         region_name = ' '.join(Countries_from) 
+        
+    # Capactiy or Flow
+    if type == "Capacity":
+        title = f'Box Plot: H2 Transmission Capacity between {region_name} and Neighboring Countries ({YEAR})'
+        xaxis_title = "H2 Transmission Capacity [GW]"
+    elif type == "Flow":
+        title = f'Box Plot: H2 Transmission Flow between {region_name} and Neighboring Countries ({YEAR})'
+        xaxis_title = "H2 Transmission Flow [TWh]"
 
     # Adjust layout
     fig.update_layout(
         title={
-            'text': f'Box Plot: H2 Transmission Capacity between {region_name} and Neighboring Countries ({YEAR})',
+            'text': title,
             'font': {'size': 15}
             },
         yaxis_title="Neighboring Countries",
-        xaxis_title="H2 Transmission Capacity [GW]",
+        xaxis_title=xaxis_title,
         height=500,
         width=900,
         margin=dict(
@@ -674,99 +684,11 @@ def BoxPlot_CAP(dict_df_XH2_CAP_TO_BASE, dict_df_XH2_CAP_TO_scen, Countries_from
             t=100,
             b=100)
             )
+    
+    # Adjuste x-axis limits
+    fig.update_xaxes(range=[0, max_upper_fence * 1.2])
 
     # Show the figure
     fig.show()
 
     return(fig)
-
-# Function for box plot of transmission capacities 
-def BoxPlot_FLOW(dict_df_XH2_FLOW_TO_BASE, dict_df_XH2_FLOW_TO_scen, Countries_from: list[str], YEAR) :
-    
-    dict_BASE = dict_df_XH2_FLOW_TO_BASE.copy()
-    dict_scen = dict_df_XH2_FLOW_TO_scen.copy()
-    
-    # Get the keys of the dict
-    keys = list(dict_df_XH2_FLOW_TO_BASE.keys())
-    neighbors = [key for key in keys if key not in Countries_from]
-    
-    baseline_y = np.array([dict_BASE[key]['value'].sum() for key in neighbors])
-    means_y = np.array([dict_BASE[key]['value'].mean() for key in neighbors])
-    
-    # Combine the data into one DataFrame with an additional 'category' column
-    L = []
-    for key in neighbors :
-        df = dict_scen[key].copy()
-        df['category'] = key
-        L.append(df)
-    
-    combined_df = pd.concat(L)
-
-    # Create the box plot using go.Box to control width
-    fig = go.Figure()
-
-    # Define colors for each category
-    # Function to darken a color by a factor
-    def darken_color(color, factor=0.7):
-        rgb = mcolors.to_rgb(color)  # Convert to RGB
-        darkened_rgb = tuple([c * factor for c in rgb])  # Darken by scaling each component
-        return darkened_rgb
-
-    colormap = plt.cm.viridis  # You can use other colormaps like 'plasma', 'coolwarm', etc.
-    num_colors = len(neighbors)
-    base_colors = [colormap(i / num_colors) for i in range(num_colors)]
-
-    # Generate the dictionaries
-    colors_dict = {key: mcolors.to_hex(base_colors[i]) for i, key in enumerate(neighbors)}
-    dark_colors_dict = {key: mcolors.to_hex(darken_color(base_colors[i])) for i, key in enumerate(neighbors)}
-
-    # Add box plots for each category
-    for category in neighbors:
-        fig.add_trace(go.Box(
-            x=combined_df[combined_df['category'] == category]['value'],
-            name=category,
-            marker_color=colors_dict[category],
-            # boxmean='sd',
-            width=0.15  # Adjust the width of the box plots
-        ))
-
-    # Add baseline markers
-    for i, baseline in enumerate(baseline_y):
-        fig.add_trace(go.Scatter(y=[neighbors[i]], x=[baseline],
-                                mode='markers', marker=dict(color=colors_dict[neighbors[i]], size=8, symbol='circle'),
-                                name=f'Baseline {neighbors[i]}'))
-
-    # Add mean markers
-    for i, means in enumerate(means_y):
-        fig.add_trace(go.Scatter(y=[neighbors[i]], x=[means],
-                                mode='markers', marker=dict(color=dark_colors_dict[neighbors[i]], size=8, symbol='x'),
-                                name=f'Mean {neighbors[i]}'))
-
-    # Name of the region
-    try : 
-        region_name = Regions_name[tuple(Countries_from)]
-    except :
-        region_name = ' '.join(Countries_from) 
-
-    # Adjust layout
-    fig.update_layout(
-        title={
-            'text': f'Box Plot: H2 Transmission Flow between {region_name} and Neighboring Countries ({YEAR})',
-            'font': {'size': 15}
-            },
-        yaxis_title="Neighboring Countries",
-        xaxis_title="H2 Transmission Flow [TWh]",
-        height=500,
-        width=900,
-        margin=dict(
-            l=50,
-            r=50,
-            t=100,
-            b=100)
-            )
-
-    # Show the figure
-    fig.show()
-
-    return(fig)
-    
