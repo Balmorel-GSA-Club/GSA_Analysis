@@ -54,7 +54,6 @@ def LIM_RE_CAP_scen(df_SUBTECH) :
     
     df_SUBTECH['C'] = df_SUBTECH['CCCRRRAAA'].map(RRR_to_CCC)
     df_RE_SUBTECH = df_SUBTECH.groupby(['scenarios','C','TECH_GROUP'])['value'].sum().reset_index()
-    df_RE_SUBTECH = df_RE_SUBTECH.sort_values(by=['scenarios'],ascending=True)
     df_RE_SUBTECH['value'] = df_RE_SUBTECH['value']/1000
     
     return df_RE_SUBTECH
@@ -276,11 +275,61 @@ def XH2_scen(df_XH2, scen, Countries_from: list[str], YEAR):
 
 #### Plotting functions ####
 
+# Function to plot the RE installed capacities
+def RE_CAP(df_RE_CAP, Countries: list[str], YEAR) :
+    
+    df_RE_CAP = df_RE_CAP[df_RE_CAP['C'].isin(Countries)].reset_index(drop=True)
+    
+    df_RE_CAP = df_RE_CAP.groupby(['scenarios','TECH_GROUP'])['value'].sum().reset_index()
+    
+    df_RE_CAP_WINDON = df_RE_CAP[df_RE_CAP['TECH_GROUP']=='WINDTURBINE_ONSHORE']['value'].reset_index(drop=True)
+    df_RE_CAP_WINDOFF = df_RE_CAP[df_RE_CAP['TECH_GROUP']=='WINDTURBINE_OFFSHORE']['value'].reset_index(drop=True)
+    df_RE_CAP_SOLARPV = df_RE_CAP[df_RE_CAP['TECH_GROUP']=='SOLARPV']['value'].reset_index(drop=True)
+    
+    # Create subplots
+    fig = make_subplots(rows=1, cols=3, horizontal_spacing=0.07)
+
+    # Plotting Wind Onshore Histogram
+    fig.add_trace(go.Histogram(x=df_RE_CAP_WINDON, name='Wind Onshore', marker_color='lightskyblue', opacity=0.8), row=1, col=1)
+
+    # Plotting Wind Offshore Histogram
+    fig.add_trace(go.Histogram(x=df_RE_CAP_WINDOFF, name='Wind Offshore', marker_color='darkblue', opacity=0.8), row=1, col=2)
+
+    # Plotting Solar PV Histogram
+    fig.add_trace(go.Histogram(x=df_RE_CAP_SOLARPV, name='Solar PV', marker_color='orange', opacity=0.8), row=1, col=3)
+
+    annotations = [
+        dict(xref='paper', yref='paper', x=0.5, y=-0.1, xanchor='center', yanchor='top', text='Wind Offshore [GW]', showarrow=False, font=dict(size=15)),
+        dict(xref='paper', yref='paper', x=0.125, y=-0.1, xanchor='center', yanchor='top', text='Wind Onshore [GW]', showarrow=False, font=dict(size=15)),
+        dict(xref='paper', yref='paper', x=0.875, y=-0.1, xanchor='center', yanchor='top', text='Solar PV [GW]', showarrow=False, font=dict(size=15)),
+        dict(xref='paper', yref='paper', x=-0.03, y=0.5, xanchor='right', yanchor='middle', text='Frequency', showarrow=False, font=dict(size=15), textangle=-90)
+    ]
+    
+    # Name of the region
+    try : 
+        region_name = Regions_name[tuple(Countries)]
+    except :
+        region_name = ' '.join(Countries)
+
+    # Update layout with custom axis titles and overall figure adjustments
+    fig.update_layout(
+        title=f'Histograms of Renewables in {region_name} ({YEAR})',
+        width=1350,
+        height=500,
+        annotations=annotations,
+        legend=dict(x=0.5, y=1.1, xanchor='center', yanchor='top', orientation='h',font=dict(size=11))
+    )
+
+    # Show the figure
+    fig.show()
+
+    return(fig)
+
 # Function to Compare the RE installed capacities to the RE limits
 def COMP_RE_LIM(df_RE_SUBTECH, df_RE_CAP, Countries: list[str], YEAR) :
     
-    df_RE_SUBTECH = df_RE_SUBTECH[df_RE_SUBTECH['C'].isin(Countries)]
-    df_RE_CAP = df_RE_CAP[df_RE_CAP['C'].isin(Countries)]
+    df_RE_SUBTECH = df_RE_SUBTECH[df_RE_SUBTECH['C'].isin(Countries)].reset_index(drop=True)
+    df_RE_CAP = df_RE_CAP[df_RE_CAP['C'].isin(Countries)].reset_index(drop=True)
     
     df_RE_SUBTECH = df_RE_SUBTECH.groupby(['scenarios','TECH_GROUP'])['value'].sum().reset_index()
     df_RE_CAP = df_RE_CAP.groupby(['scenarios','TECH_GROUP'])['value'].sum().reset_index()
