@@ -641,6 +641,15 @@ def BoxPlot_Transmission(dict_df_XH2_TO_BASE, dict_df_XH2_TO_scen, Countries_fro
             # boxmean='sd',
             width=0.15  # Adjust the width of the box plots
         ))
+        
+    max_whisker = 0
+    # Calculate the max whisker value
+    for category in neighbors:
+        q3 = combined_df[combined_df['category'] == category]['value'].quantile(0.75)
+        iqr = combined_df[combined_df['category'] == category]['value'].quantile(0.75) - combined_df[combined_df['category'] == category]['value'].quantile(0.25)
+        whisker = q3 + 1.5 * iqr
+        if whisker > max_whisker:
+            max_whisker = whisker
 
     # Add baseline markers
     for i, baseline in enumerate(baseline_y):
@@ -686,7 +695,7 @@ def BoxPlot_Transmission(dict_df_XH2_TO_BASE, dict_df_XH2_TO_scen, Countries_fro
             )
     
     # Adjuste x-axis limits
-    fig.update_xaxes(range=[0, max_upper_fence * 1.2])
+    fig.update_xaxes(range=[0, max_whisker * 1.2])
 
     # Show the figure
     fig.show()
