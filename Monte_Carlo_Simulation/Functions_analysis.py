@@ -191,9 +191,8 @@ def Import_MonteCarlo(file_path):
 def RE_CAP_scen(df_CAP, YEAR) :
     
     df_CAP['TECH_GROUP'] = df_CAP['TECH_TYPE'].map(TECHT_to_TECHG)
-    df_CAP = df_CAP[(df_CAP['TECH_GROUP'].isin(['SOLARPV', 'WINDTURBINE_ONSHORE', 'WINDTURBINE_OFFSHORE'])) & (df_CAP['Y']==YEAR)]
+    df_CAP = df_CAP[(df_CAP['TECH_GROUP'].isin(['SOLARPV', 'WINDTURBINE_ONSHORE', 'WINDTURBINE_OFFSHORE'])) & (df_CAP['Y']==YEAR)].reset_index(drop=True)
     df_RE_CAP = df_CAP.groupby(['scenarios','C','TECH_GROUP'])['value'].sum().reset_index()
-    df_RE_CAP = df_RE_CAP.sort_values(by=['scenarios'],ascending=True)
     
     return df_RE_CAP
 
@@ -279,6 +278,7 @@ def XH2_scen(df_XH2, scen, Countries_from: list[str], YEAR):
 def RE_CAP(df_RE_CAP, Countries: list[str], YEAR) :
     
     df_RE_CAP = df_RE_CAP[df_RE_CAP['C'].isin(Countries)].reset_index(drop=True)
+    print(df_RE_CAP[df_RE_CAP['scenarios']==1])
     
     df_RE_CAP = df_RE_CAP.groupby(['scenarios','TECH_GROUP'])['value'].sum().reset_index()
     
@@ -508,6 +508,85 @@ def ECDF_Hist_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_GREEN_tot
         legend=dict(x=0.5, y=1.1, xanchor='center', yanchor='top', orientation='h',font=dict(size=11))
     )
 
+    fig.show()
+
+    return(fig)
+
+# Function to violin plot the distribution of H2 production
+def Violin_Setups(df_H2_BASE_scen, df_H2_NoH2_scen, df_H2_NoH2Import_scen, df_H2_tot_BASE, df_H2_tot_NoH2, df_H2_tot_NoH2Import, Countries_from: list[str], YEAR, type: str) :
+    if type not in ["Green Capacity", "Blue Capacity", "Green Production", "Blue Production", "Storage", "Transmission Capacity", "Transmission Flow"]: 
+        raise ValueError(f"Invalid type: {type}")
+    
+    # Example DataFrames and baseline values (ensure these dataframes and variables are defined)
+    baseline_y = np.array([df_H2_tot_BASE, df_H2_tot_NoH2, df_H2_tot_NoH2Import])
+
+    df_H2_BASE_scen['category'] = 'Base'
+    df_H2_NoH2_scen['category'] = 'No H2 Target'
+    df_H2_NoH2Import_scen['category'] = 'No H2 Import'
+
+    # Combine the dataframes into a single dataframe
+    combined_df = pd.concat([df_H2_BASE_scen, df_H2_NoH2_scen, df_H2_NoH2Import_scen])
+    
+    # Color and unit of the violin plots
+    if type in ["Green Capacity", "Green Production"]:
+        color = 'green'
+    elif type in ["Blue Capacity", "Blue Production"]:
+        color = 'blue'
+    elif type == "Storage":
+        color = 'orange'
+        unit = 'TWh'
+    elif type in ["Transmission Capacity"]:
+        color = 'red'
+        unit = 'GW'
+    elif type in ["Transmission Flow"]:
+        color = 'red'
+        unit = 'TWh'
+    
+    if "Capacity" in type:
+        unit = 'GW'
+    elif "Production" in type:
+        unit = 'TWh'
+
+    # Create plot
+    fig = go.Figure()
+
+    # Plot Green H2
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Base']['value'], name='Base',
+                            box_visible=True, line_color=color))
+    fig.add_trace(go.Scatter(x=['Base'], y=[baseline_y[0]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline Base'))
+
+    # Plot Blue H2
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target']['value'], name='No H2 Target',
+                            box_visible=True, line_color=color))
+    fig.add_trace(go.Scatter(x=['No H2 Target'], y=[baseline_y[1]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target'))
+
+    # Plot Storage H2
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Import']['value'], name='No H2 Import',
+                            box_visible=True, line_color=color))
+    fig.add_trace(go.Scatter(x=['No H2 Import'], y=[baseline_y[2]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Import'))
+   
+    # Name of the region
+    try : 
+        region_name = Regions_name[tuple(Countries_from)]
+    except :
+        region_name = ' '.join(Countries_from) 
+    
+    fig.update_layout(
+        title={
+            'text': f'Violin Plot: Value Distribution of H2 {type} in {region_name} ({YEAR})',
+            'font': {'size': 16}
+        },
+        yaxis_title=f"H2 {type} [{unit}]",
+        height=600,
+        width=1200,
+        legend=dict(orientation='h', x=0.5, y=1.04, xanchor='center', yanchor='bottom'),  # Adjust legend position
+        margin=dict(t=120, b=100)  # Adjust top and bottom margins to accommodate title and legend
+    )
+
+    # Show the figure
     fig.show()
 
     return(fig)
