@@ -278,7 +278,6 @@ def XH2_scen(df_XH2, scen, Countries_from: list[str], YEAR):
 def RE_CAP(df_RE_CAP, Countries: list[str], YEAR) :
     
     df_RE_CAP = df_RE_CAP[df_RE_CAP['C'].isin(Countries)].reset_index(drop=True)
-    print(df_RE_CAP[df_RE_CAP['scenarios']==1])
     
     df_RE_CAP = df_RE_CAP.groupby(['scenarios','TECH_GROUP'])['value'].sum().reset_index()
     
@@ -609,7 +608,7 @@ def Violin_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df
     combined_df = pd.concat([df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen])
 
     # Create subplots
-    fig = make_subplots(rows=1, cols=3)
+    fig = make_subplots(rows=1, cols=2, column_widths=[2/3, 1/3])
 
     # Plot Green H2
     fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Green H2']['value'], name='Green H2',
@@ -619,20 +618,15 @@ def Violin_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df
 
     # Plot Blue H2
     fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Blue H2']['value'], name='Blue H2',
-                            box_visible=True, line_color='blue'), row=1, col=2)
+                            box_visible=True, line_color='blue'), row=1, col=1)
     fig.add_trace(go.Scatter(x=['Blue H2'], y=[baseline_y[1]], mode='markers',
-                            marker=dict(color='#34ebe5', size=10), name='Baseline Blue H2'), row=1, col=2)
+                            marker=dict(color='#34ebe5', size=10), name='Baseline Blue H2'), row=1, col=1)
 
     # Plot Storage H2
     fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Storage H2']['value'], name='Storage H2',
-                            box_visible=True, line_color='orange'), row=1, col=3)
+                            box_visible=True, line_color='orange'), row=1, col=2)
     fig.add_trace(go.Scatter(x=['Storage H2'], y=[baseline_y[2]], mode='markers',
-                            marker=dict(color='#eb4034', size=10), name='Baseline Storage H2'), row=1, col=3)
-    # Update y axes
-    # fig.update_yaxes(range=[0,40],row=1,col=1)
-    # fig.update_yaxes(range=[0,10],row=1,col=2)
-    # fig.update_yaxes(range=[0,1.8],row=1,col=3)
-    # Adjust layout with the legend below the title and above the plots
+                            marker=dict(color='#eb4034', size=10), name='Baseline Storage H2'), row=1, col=2)
    
     # Name of the region
     try : 
@@ -646,8 +640,7 @@ def Violin_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df
             'font': {'size': 16}
         },
         yaxis_title="H2 Production [TWh]",
-        yaxis2_title="H2 Production [TWh]",
-        yaxis3_title="H2 Storage [TWh]",
+        yaxis2_title="H2 Storage [TWh]",
         height=600,
         width=1200,
         legend=dict(orientation='h', x=0.5, y=1.04, xanchor='center', yanchor='bottom'),  # Adjust legend position
@@ -677,23 +670,19 @@ def Violin_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_STO_scen, df
     combined_df = pd.concat([df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_STO_scen])
 
     # Create subplots with 1 row and 3 columns
-    fig = make_subplots(rows=1, cols=2)
+    fig = go.Figure()
 
     # Add violin plots to each subplot
     fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Green H2']['value'], name='Green H2',
-                            line_color='green', box_visible=True, meanline_visible=False), row=1, col=1)
+                            line_color='green', box_visible=True, meanline_visible=False))
     fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Blue H2']['value'], name='Blue H2',
-                            line_color='blue', box_visible=True, meanline_visible=False), row=1, col=2)
-    # fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Storage H2']['value'], name='Storage H2',
-    #                         line_color='orange', box_visible=True, meanline_visible=True), row=1, col=3)
+                            line_color='blue', box_visible=True, meanline_visible=False))
 
     # Add baseline markers for each category
     fig.add_trace(go.Scatter(x=['Green H2'], y=[baseline_y[0]], mode='markers',
-                            marker=dict(color='#a5eb34', size=10), name='Baseline Green H2'), row=1, col=1)
+                            marker=dict(color='#a5eb34', size=10), name='Baseline Green H2'))
     fig.add_trace(go.Scatter(x=['Blue H2'], y=[baseline_y[1]], mode='markers',
-                            marker=dict(color='#34ebe5', size=10), name='Baseline Blue H2'), row=1, col=2)
-    # fig.add_trace(go.Scatter(x=['Storage H2'], y=[baseline_y[2]], mode='markers',
-    #                          marker=dict(color='#eb4034', size=10), name='Baseline Storage H2'), row=1, col=3)
+                            marker=dict(color='#34ebe5', size=10), name='Baseline Blue H2'))
     #Update y-axes
     # fig.update_yaxes(range=[0,1],row=1,col=2)
     # Adjust layout
@@ -707,7 +696,6 @@ def Violin_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_STO_scen, df
     fig.update_layout(
         title=f'Violin Plot: Value Distribution of H2 Capacity in {region_name} ({YEAR})',
         yaxis_title="H2 Capacity [GW]",
-        yaxis2_title="H2 Capacity [GW]",
         height=600,
         width=1200,
         showlegend=False  # Optionally hide the legend if it is not needed
