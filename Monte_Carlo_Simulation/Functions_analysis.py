@@ -89,7 +89,7 @@ def H2_CAP(df_CAP, Countries: list[str], YEAR) :
         raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries).__name__}.")
     
     #HYDROGEN CAPACITY 
-    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR)]
+    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR) & (df_CAP['FFF'] != 'IMPORT_H2')]
     #GREEN HYDROGEN CAPACITY
     df_H2_CAP_GREEN = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='ELECTROLYZER')]
     df_H2_CAP_GREEN_tot = df_H2_CAP_GREEN['value'].sum()
@@ -108,7 +108,7 @@ def H2_PRO(df_PRO, df_CAP, Countries: list[str], YEAR) :
         raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries).__name__}.")
     
     #HYDROGEN CAPACITY 
-    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR)]
+    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR) & (df_CAP['FFF'] != 'IMPORT_H2')]
     #HYDROGEN PRODUCTION 
     df_H2_PRO = df_PRO[(df_PRO['COMMODITY']=='HYDROGEN') & (df_PRO['C'].isin(Countries)) & (df_PRO['Y']==YEAR)]
     #GREEN HYDROGEN PRODUCTION
@@ -201,7 +201,7 @@ def H2_CAP_scen(df_CAP, scen, Countries: list[str], YEAR):
     if not isinstance(Countries, list):
         raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries).__name__}.")
     
-    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR)]
+    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR) & (df_CAP['FFF'] != 'IMPORT_H2')]
     df_H2_CAP_GREEN = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='ELECTROLYZER')]
     df_H2_CAP_BLUE = df_H2_CAP[(df_H2_CAP['G'].str.contains('CCS')) & ((df_H2_CAP['TECH_TYPE']=='STEAMREFORMING'))]
     df_H2_CAP_STO = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='H2-STORAGE')]
@@ -225,7 +225,7 @@ def H2_PRO_scen(df_PRO, df_CAP, scen, Countries: list[str], YEAR):
     if not isinstance(Countries, list):
         raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries).__name__}.")
     
-    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR)]
+    df_H2_CAP = df_CAP[(df_CAP['COMMODITY']=='HYDROGEN') & (df_CAP['C'].isin(Countries)) & (df_CAP['Y']==YEAR) & (df_CAP['FFF'] != 'IMPORT_H2')]
     df_H2_PRO = df_PRO[(df_PRO['COMMODITY']=='HYDROGEN') & (df_PRO['C'].isin(Countries)) & (df_PRO['Y']==YEAR)]
     
     df_H2_PRO_GREEN = df_H2_PRO[(df_H2_PRO['TECH_TYPE']=='ELECTROLYZER')]
