@@ -132,21 +132,25 @@ def H2_PRO(df_PRO, df_CAP, Countries: list[str], YEAR) :
     return df_H2_PRO, df_H2_PRO_GREEN, df_H2_PRO_GREEN_tot, df_H2_PRO_BLUE, df_H2_PRO_BLUE_tot, df_H2_PRO_STO, df_H2_PRO_STO_tot
 
 # Function to extract transmission capacities and flows
-def XH2(df_XH2, Countries_from: list[str], YEAR) :
+def XH2(df_XH2, Countries_from: list[str], YEAR, parameter: str) :
     if not isinstance(Countries_from, list):
         raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries_from).__name__}.")
     
     df_XH2 = df_XH2[df_XH2['Y']==YEAR]
     df_XH2['CI'] = df_XH2['IRRRI'].map(RRR_to_CCC)
     df_XH2 = df_XH2[(df_XH2['C'].isin(Countries_from))]
-    df_XH2_tot = df_XH2.groupby(['CI'])['value'].sum().reset_index()
-    Countries_to = df_XH2_tot['CI'].unique()
-    dict_df_XH2_TO = {}
-    for country in Countries_to :
-        dict_df_XH2_TO[country] = df_XH2_tot[(df_XH2_tot['CI'].isin([country]))]
     
-    return dict_df_XH2_TO
-
+    if parameter == 'dict' :
+        df_XH2_tot = df_XH2.groupby(['CI'])['value'].sum().reset_index()
+        Countries_to = df_XH2_tot['CI'].unique()
+        dict_df_XH2_TO = {}
+        for country in Countries_to :
+            dict_df_XH2_TO[country] = df_XH2_tot[(df_XH2_tot['CI'].isin([country]))]
+        return dict_df_XH2_TO
+    
+    elif parameter == 'total' :
+        XH2_tot = df_XH2['value'].sum()
+        return XH2_tot
 
 
 
@@ -249,27 +253,29 @@ def H2_PRO_scen(df_PRO, df_CAP, scen, Countries: list[str], YEAR):
     return df_H2_PRO, df_H2_PRO_GREEN, df_H2_PRO_BLUE, df_H2_PRO_STO
 
 # Function to extract transmission capacities and flows
-def XH2_scen(df_XH2, scen, Countries_from: list[str], YEAR):
+def XH2_scen(df_XH2, scen, Countries_from: list[str], YEAR, parameter: str) :
     if not isinstance(Countries_from, list):
         raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries_from).__name__}.")
     
     df_XH2 = df_XH2[df_XH2['Y']==YEAR]
     df_XH2['CI'] = df_XH2['IRRRI'].map(RRR_to_CCC)
     df_XH2 = df_XH2[(df_XH2['C'].isin(Countries_from))]
-    df_XH2_tot = df_XH2.groupby(['scenarios','CI'])['value'].sum().reset_index()
-    Countries_to = df_XH2_tot['CI'].unique()
-    dict_df_XH2_TO_scen = {}
-    for country in Countries_to :
-        df_XH2_tot_TO = df_XH2_tot[(df_XH2_tot['CI'].isin([country]))]
-        df_XH2_tot_TO = df_XH2_tot_TO.groupby('scenarios').sum().reset_index()
-        df_XH2_tot_TO = df_XH2_tot_TO.sort_values(by=['scenarios'],ascending=True)
-        df_XH2_tot_TO = df_XH2_tot_TO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
-        dict_df_XH2_TO_scen[country] = df_XH2_tot_TO
-
-    # df_XH2_tot = df_XH2_tot.drop(columns=['CI'])
-    # df_XH2_tot_TO = df_XH2_tot_TO.drop(columns=['CI'], errors='ignore')
-
-    return df_XH2_tot, dict_df_XH2_TO_scen
+    
+    if parameter == 'dict' :
+        df_XH2_tot = df_XH2.groupby(['scenarios','CI'])['value'].sum().reset_index()
+        Countries_to = df_XH2_tot['CI'].unique()
+        dict_df_XH2_TO_scen = {}
+        for country in Countries_to :
+            df_XH2_tot_TO = df_XH2_tot[(df_XH2_tot['CI'].isin([country]))]
+            df_XH2_tot_TO = df_XH2_tot_TO.groupby('scenarios').sum().reset_index()
+            df_XH2_tot_TO = df_XH2_tot_TO.sort_values(by=['scenarios'],ascending=True)
+            df_XH2_tot_TO = df_XH2_tot_TO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+            dict_df_XH2_TO_scen[country] = df_XH2_tot_TO
+        return df_XH2_tot, dict_df_XH2_TO_scen
+    
+    elif parameter == 'total' :
+        df_XH2_tot = df_XH2.groupby(['scenarios'])['value'].sum().reset_index()
+        return df_XH2_tot
 
 
 #### Plotting functions ####
@@ -536,14 +542,12 @@ def Violin_Setups(df_H2_BASE_scen, df_H2_NoH2_scen, df_H2_NoH2Import_scen, df_H2
         unit = 'TWh'
     elif type in ["Transmission Capacity"]:
         color = 'red'
-        unit = 'GW'
     elif type in ["Transmission Flow"]:
         color = 'red'
-        unit = 'TWh'
     
     if "Capacity" in type:
         unit = 'GW'
-    elif "Production" in type:
+    elif "Production" in type or "Flow" in type:
         unit = 'TWh'
 
     # Create plot
