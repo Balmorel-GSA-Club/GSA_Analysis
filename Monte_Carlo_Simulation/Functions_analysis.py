@@ -120,12 +120,15 @@ def H2_PRO(df_PRO, df_CAP, Countries: list[str], YEAR) :
     #STO HYDROGEN PRODUCTION
     df_H2_PRO_STO = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='H2-STORAGE')]
     def apply_factor(row):
-        if 'GNR_H2S_H2-TNKC_Y' in row['G']:
+        if not isinstance(row['G'], str) or row['G'] == "":
+            return None
+        elif 'GNR_H2S_H2-TNKC_Y' in row['G']:
             return row['value'] * 0.5 /1000
         elif 'GNR_H2S_H2-CAVERN_Y' in row['G']:
             return row['value'] * 180 /1000
         else:
             return row['value']
+  
     df_H2_PRO_STO['adjusted_value'] = df_H2_PRO_STO.apply(apply_factor, axis=1)
     df_H2_PRO_STO_tot = df_H2_PRO_STO['adjusted_value'].sum()
     
@@ -244,11 +247,14 @@ def H2_PRO_scen(df_PRO, df_CAP, scen, Countries: list[str], YEAR):
     df_H2_PRO_GREEN = df_H2_PRO_GREEN.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
     df_H2_PRO_BLUE  = df_H2_PRO_BLUE.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
     
-    df_H2_PRO_STO = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='H2-STORAGE')]    
-    df_H2_PRO_STO['factor'] = df_H2_PRO_STO['G'].apply(lambda g: 0.5 if 'H2-TNKC' in g else (180 if 'H2-CAVERN' in g else 1))
-    df_H2_PRO_STO = df_H2_PRO_STO.groupby('scenarios').apply(lambda x: (x['value'] * x['factor']/1000).sum()).reset_index(name='value')
-    df_H2_PRO_STO = df_H2_PRO_STO.sort_values(by='scenarios', ascending=True)
-    df_H2_PRO_STO = df_H2_PRO_STO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    df_H2_PRO_STO = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='H2-STORAGE')]      
+    if len(df_H2_PRO_STO) > 0:
+        df_H2_PRO_STO['factor'] = df_H2_PRO_STO['G'].apply(lambda g: 0.5 if 'H2-TNKC' in g else (180 if 'H2-CAVERN' in g else 1))
+        df_H2_PRO_STO = df_H2_PRO_STO.groupby('scenarios').apply(lambda x: (x['value'] * x['factor']/1000).sum()).reset_index(name='value')
+        df_H2_PRO_STO = df_H2_PRO_STO.sort_values(by='scenarios', ascending=True)
+        df_H2_PRO_STO = df_H2_PRO_STO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    else : df_H2_PRO_STO = pd.DataFrame({'scenarios': scen, 'value': [0] * len(scen)})
+
 
     return df_H2_PRO, df_H2_PRO_GREEN, df_H2_PRO_BLUE, df_H2_PRO_STO
 
