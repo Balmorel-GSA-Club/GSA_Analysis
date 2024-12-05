@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.metrics import r2_score
 
 #### Useful dictionnaries #####
@@ -69,8 +70,9 @@ def Import_MainResults(file_path) :
     df_CAP = pd.DataFrame(df.data["G_CAP_YCRAF"].records)
     df_XH2_CAP = pd.DataFrame(df.data["XH2_CAP_YCR"].records)
     df_XH2_FLOW = pd.DataFrame(df.data["XH2_FLOW_YCR"].records)
+    df_PRO_STO = pd.DataFrame(df.data["G_STO_YCRAF"].records)
     
-    return df_PRO, df_CAP, df_XH2_CAP, df_XH2_FLOW
+    return df_PRO, df_CAP, df_XH2_CAP, df_XH2_FLOW, df_PRO_STO
 
 # Function to import the CCS table from the MainResults file
 def Import_CCS(file_path, YEAR) :
@@ -103,7 +105,7 @@ def H2_CAP(df_CAP, Countries: list[str], YEAR) :
     return df_H2_CAP, df_H2_CAP_GREEN, df_H2_CAP_GREEN_tot, df_H2_CAP_BLUE, df_H2_CAP_BLUE_tot, df_H2_CAP_STO, df_H2_CAP_STO_tot
 
 # Function to extract the info about the hydrogen production
-def H2_PRO(df_PRO, df_CAP, Countries: list[str], YEAR) :
+def H2_PRO(df_PRO, df_PRO_STO, df_CAP, Countries: list[str], YEAR) :
     if not isinstance(Countries, list):
         raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries).__name__}.")
     
@@ -118,19 +120,9 @@ def H2_PRO(df_PRO, df_CAP, Countries: list[str], YEAR) :
     df_H2_PRO_BLUE = df_H2_PRO[(df_H2_PRO['G'].str.contains('CCS')) & ((df_H2_PRO['TECH_TYPE']=='STEAMREFORMING'))]
     df_H2_PRO_BLUE_tot = df_H2_PRO_BLUE['value'].sum()
     #STO HYDROGEN PRODUCTION
-    df_H2_PRO_STO = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='H2-STORAGE')]
-    def apply_factor(row):
-        if not isinstance(row['G'], str) or row['G'] == "":
-            return None
-        elif 'GNR_H2S_H2-TNKC_Y' in row['G']:
-            return row['value'] * 0.5 /1000
-        elif 'GNR_H2S_H2-CAVERN_Y' in row['G']:
-            return row['value'] * 180 /1000
-        else:
-            return row['value']
-  
-    df_H2_PRO_STO['adjusted_value'] = df_H2_PRO_STO.apply(apply_factor, axis=1)
-    df_H2_PRO_STO_tot = df_H2_PRO_STO['adjusted_value'].sum()
+    df_H2_PRO_STO = df_PRO_STO[(df_PRO_STO['TECH_TYPE']=='H2-STORAGE') & (df_PRO_STO['C'].isin(Countries))]
+    df_H2_PRO_STO.loc[:,'value'] = df_H2_PRO_STO['value']/1000
+    df_H2_PRO_STO_tot = df_H2_PRO_STO['value'].sum()
     
     return df_H2_PRO, df_H2_PRO_GREEN, df_H2_PRO_GREEN_tot, df_H2_PRO_BLUE, df_H2_PRO_BLUE_tot, df_H2_PRO_STO, df_H2_PRO_STO_tot
 
@@ -168,6 +160,7 @@ def Import_MonteCarlo(file_path):
     df_CAP        = pd.DataFrame(df_merged.data["G_CAP_YCRAF"].records)
     df_XH2_CAP    = pd.DataFrame(df_merged.data["XH2_CAP_YCR"].records)
     df_XH2_FLOW   = pd.DataFrame(df_merged.data["XH2_FLOW_YCR"].records)
+    df_PRO_STO        = pd.DataFrame(df_merged.data["G_STO_YCRAF"].records)
 
     PRO_YCRAGF_headers     = ['scenarios', 'Y', 'C', 'RRR', 'AAA', 'G', 'FFF', 'COMMODITY', 'TECH_TYPE', 'UNITS', 'value']
     G_CAP_YCRAF_headers    = ['scenarios', 'Y', 'C', 'RRR', 'AAA', 'G', 'FFF', 'COMMODITY', 'TECH_TYPE', 'VARIABLE_CATEGORY', 'UNITS', 'value']
@@ -178,22 +171,25 @@ def Import_MonteCarlo(file_path):
     df_CAP.columns       = G_CAP_YCRAF_headers
     df_XH2_CAP.columns   = XH2_CAP_YCR_headers
     df_XH2_FLOW.columns  = XH2_FLOW_YCR_headers
+    df_PRO_STO.columns       = G_CAP_YCRAF_headers
 
     #drop na 
     df_PRO = df_PRO.dropna()
     df_CAP = df_CAP.dropna()
     df_XH2_CAP = df_XH2_CAP.dropna()
     df_XH2_FLOW = df_XH2_FLOW.dropna()
+    df_PRO_STO = df_PRO_STO.dropna()
 
     #remove the word Scenario from the scenario column
     df_PRO['scenarios'] = df_PRO['scenarios'].str.extract(r'(\d+)').astype(int)
     df_CAP['scenarios'] = df_CAP['scenarios'].str.extract(r'(\d+)').astype(int)
     df_XH2_CAP['scenarios'] = df_XH2_CAP['scenarios'].str.extract(r'(\d+)').astype(int)
     df_XH2_FLOW['scenarios'] = df_XH2_FLOW['scenarios'].str.extract(r'(\d+)').astype(int)
+    df_PRO_STO['scenarios'] = df_PRO_STO['scenarios'].str.extract(r'(\d+)').astype(int)
 
     scen = pd.unique(df_PRO['scenarios']).tolist()
 
-    return df_PRO, df_CAP, df_XH2_CAP, df_XH2_FLOW, scen
+    return df_PRO, df_CAP, df_XH2_CAP, df_XH2_FLOW, df_PRO_STO, scen
 
 def RE_CAP_scen(df_CAP, YEAR) :
     
@@ -228,7 +224,7 @@ def H2_CAP_scen(df_CAP, scen, Countries: list[str], YEAR):
     return df_H2_CAP, df_H2_CAP_GREEN, df_H2_CAP_BLUE, df_H2_CAP_STO
 
 # Function to extract hydrogen production for specific countries
-def H2_PRO_scen(df_PRO, df_CAP, scen, Countries: list[str], YEAR):
+def H2_PRO_scen(df_PRO, df_PRO_STO, df_CAP, scen, Countries: list[str], YEAR):
     if not isinstance(Countries, list):
         raise TypeError(f"The 'Countries' parameter must be a list, but got {type(Countries).__name__}.")
     
@@ -247,14 +243,8 @@ def H2_PRO_scen(df_PRO, df_CAP, scen, Countries: list[str], YEAR):
     df_H2_PRO_GREEN = df_H2_PRO_GREEN.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
     df_H2_PRO_BLUE  = df_H2_PRO_BLUE.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
     
-    df_H2_PRO_STO = df_H2_CAP[(df_H2_CAP['TECH_TYPE']=='H2-STORAGE')]      
-    if len(df_H2_PRO_STO) > 0:
-        df_H2_PRO_STO['factor'] = df_H2_PRO_STO['G'].apply(lambda g: 0.5 if 'H2-TNKC' in g else (180 if 'H2-CAVERN' in g else 1))
-        df_H2_PRO_STO = df_H2_PRO_STO.groupby('scenarios').apply(lambda x: (x['value'] * x['factor']/1000).sum()).reset_index(name='value')
-        df_H2_PRO_STO = df_H2_PRO_STO.sort_values(by='scenarios', ascending=True)
-        df_H2_PRO_STO = df_H2_PRO_STO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
-    else : df_H2_PRO_STO = pd.DataFrame({'scenarios': scen, 'value': [0] * len(scen)})
-
+    df_H2_PRO_STO = df_PRO_STO[(df_PRO_STO['TECH_TYPE']=='H2-STORAGE') & (df_PRO_STO['C'].isin(Countries))]      
+    df_H2_PRO_STO.loc[:,'value'] = df_H2_PRO_STO['value']/1000
 
     return df_H2_PRO, df_H2_PRO_GREEN, df_H2_PRO_BLUE, df_H2_PRO_STO
 
@@ -524,19 +514,18 @@ def ECDF_Hist_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_GREEN_tot
     return(fig)
 
 # Function to violin plot the distribution of H2 production
-def Violin_Setups(df_H2_BASE_scen, df_H2_NoH2_scen, df_H2_NoH2Import_scen, df_H2_tot_BASE, df_H2_tot_NoH2, df_H2_tot_NoH2Import, Countries_from: list[str], YEAR, type: str) :
+def Violin_Setups(df_H2_BASE_scen, df_H2_NoH2_scen, df_H2_tot_BASE, df_H2_tot_NoH2, Countries_from: list[str], YEAR, type: str) :
     if type not in ["Green Capacity", "Blue Capacity", "Green Production", "Blue Production", "Storage", "Transmission Capacity", "Transmission Flow"]: 
         raise ValueError(f"Invalid type: {type}")
     
     # Example DataFrames and baseline values (ensure these dataframes and variables are defined)
-    baseline_y = np.array([df_H2_tot_BASE, df_H2_tot_NoH2, df_H2_tot_NoH2Import])
+    baseline_y = np.array([df_H2_tot_BASE, df_H2_tot_NoH2])
 
     df_H2_BASE_scen['category'] = 'Base'
     df_H2_NoH2_scen['category'] = 'No H2 Target'
-    df_H2_NoH2Import_scen['category'] = 'No H2 Import'
 
     # Combine the dataframes into a single dataframe
-    combined_df = pd.concat([df_H2_BASE_scen, df_H2_NoH2_scen, df_H2_NoH2Import_scen])
+    combined_df = pd.concat([df_H2_BASE_scen, df_H2_NoH2_scen])
     
     # Color and unit of the violin plots
     if type in ["Green Capacity", "Green Production"]:
@@ -571,11 +560,6 @@ def Violin_Setups(df_H2_BASE_scen, df_H2_NoH2_scen, df_H2_NoH2Import_scen, df_H2
     fig.add_trace(go.Scatter(x=['No H2 Target'], y=[baseline_y[1]], mode='markers',
                             marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target'))
 
-    # Plot Storage H2
-    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Import']['value'], name='No H2 Import',
-                            box_visible=True, line_color=color))
-    fig.add_trace(go.Scatter(x=['No H2 Import'], y=[baseline_y[2]], mode='markers',
-                            marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Import'))
    
     # Name of the region
     try : 
@@ -589,6 +573,7 @@ def Violin_Setups(df_H2_BASE_scen, df_H2_NoH2_scen, df_H2_NoH2Import_scen, df_H2
             'font': {'size': 16}
         },
         yaxis_title=f"H2 {type} [{unit}]",
+        yaxis_range=[0, None],
         height=600,
         width=1200,
         legend=dict(orientation='h', x=0.5, y=1.04, xanchor='center', yanchor='bottom'),  # Adjust legend position
@@ -651,6 +636,8 @@ def Violin_PRO(df_H2_PRO_GREEN_scen, df_H2_PRO_BLUE_scen, df_H2_PRO_STO_scen, df
         },
         yaxis_title="H2 Production [TWh]",
         yaxis2_title="H2 Storage [TWh]",
+        yaxis_range=[0, None],
+        yaxis2_range=[0, None],
         height=600,
         width=1200,
         legend=dict(orientation='h', x=0.5, y=1.04, xanchor='center', yanchor='bottom'),  # Adjust legend position
@@ -706,10 +693,13 @@ def Violin_CAP(df_H2_CAP_GREEN_scen, df_H2_CAP_BLUE_scen, df_H2_CAP_STO_scen, df
     fig.update_layout(
         title=f'Violin Plot: Value Distribution of H2 Capacity in {region_name} ({YEAR})',
         yaxis_title="H2 Capacity [GW]",
+        yaxis_range=[0, None],
         height=600,
         width=1200,
         showlegend=False  # Optionally hide the legend if it is not needed
+        
     )
+
 
     # Show the figure
     fig.show()
@@ -827,3 +817,139 @@ def BoxPlot_Transmission(dict_df_XH2_TO_BASE, dict_df_XH2_TO_scen, Countries_fro
     fig.show()
 
     return(fig)
+
+# Function to violin plot the distribution for the four european regions
+
+def Violin_Setups_Europe(
+    df_H2_BASE_scen_EU_North, df_H2_NoH2_scen_EU_North, df_H2_tot_BASE_EU_North, df_H2_tot_NoH2_EU_North,
+    df_H2_BASE_scen_EU_South, df_H2_NoH2_scen_EU_South, df_H2_tot_BASE_EU_South, df_H2_tot_NoH2_EU_South,
+    df_H2_BASE_scen_EU_West, df_H2_NoH2_scen_EU_West, df_H2_tot_BASE_EU_West, df_H2_tot_NoH2_EU_West,
+    df_H2_BASE_scen_EU_East, df_H2_NoH2_scen_EU_East, df_H2_tot_BASE_EU_East, df_H2_tot_NoH2_EU_East,
+    YEAR, type: str
+):
+    if type not in ["Green Capacity", "Blue Capacity", "Green Production", "Blue Production", "Storage", "Transmission Capacity", "Transmission Flow"]: 
+        raise ValueError(f"Invalid type: {type}")
+    
+    # Baseline values
+    baseline_y = np.array([
+        df_H2_tot_BASE_EU_North, df_H2_tot_NoH2_EU_North,
+        df_H2_tot_BASE_EU_South, df_H2_tot_NoH2_EU_South,
+        df_H2_tot_BASE_EU_West, df_H2_tot_NoH2_EU_West,
+        df_H2_tot_BASE_EU_East, df_H2_tot_NoH2_EU_East
+    ])
+
+    # Assign categories
+    df_H2_BASE_scen_EU_North['category'] = 'Base EU North'
+    df_H2_NoH2_scen_EU_North['category'] = 'No H2 Target EU North'
+    df_H2_BASE_scen_EU_South['category'] = 'Base EU South'
+    df_H2_NoH2_scen_EU_South['category'] = 'No H2 Target EU South'
+    df_H2_BASE_scen_EU_West['category'] = 'Base EU West'
+    df_H2_NoH2_scen_EU_West['category'] = 'No H2 Target EU West'
+    df_H2_BASE_scen_EU_East['category'] = 'Base EU East'
+    df_H2_NoH2_scen_EU_East['category'] = 'No H2 Target EU East'
+
+    # Combine all dataframes
+    combined_df = pd.concat([
+        df_H2_BASE_scen_EU_North, df_H2_NoH2_scen_EU_North,
+        df_H2_BASE_scen_EU_South, df_H2_NoH2_scen_EU_South,
+        df_H2_BASE_scen_EU_West, df_H2_NoH2_scen_EU_West,
+        df_H2_BASE_scen_EU_East, df_H2_NoH2_scen_EU_East
+    ])
+
+    # Determine color and unit
+    if type in ["Green Capacity", "Green Production"]:
+        color = 'green'
+    elif type in ["Blue Capacity", "Blue Production"]:
+        color = 'blue'
+    elif type == "Storage":
+        color = 'orange'
+        unit = 'TWh'
+    elif type == "Transmission Capacity":
+        color = 'red'
+    elif type == "Transmission Flow":
+        color = 'red'
+
+    if "Capacity" in type:
+        unit = 'GW'
+    elif "Production" in type or "Flow" in type:
+        unit = 'TWh'
+
+    # Create plot
+    fig = go.Figure()
+
+    # Plot Base EU North
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Base EU North']['value'], name='Base EU North',
+                            box_visible=True, line_color=color))
+    fig.add_trace(go.Scatter(x=['Base EU North'], y=[baseline_y[0]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline Base EU North'))
+
+    # Plot NoH2 EU North
+    if YEAR == '2030':
+        fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU North']['value'], name='No H2 Target EU North',
+                                box_visible=True, line_color=color))
+        fig.add_trace(go.Scatter(x=['No H2 Target EU North'], y=[baseline_y[1]], mode='markers',
+                                marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU North'))
+    
+    # Plot Base EU South
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Base EU South']['value'], name='Base EU South',
+                            box_visible=True, line_color=color))
+    fig.add_trace(go.Scatter(x=['Base EU South'], y=[baseline_y[2]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline Base EU South'))
+
+    # Plot NoH2 EU South
+    if YEAR == '2030':
+        fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU South']['value'], name='No H2 Target EU South',
+                                box_visible=True, line_color=color))
+        fig.add_trace(go.Scatter(x=['No H2 Target EU South'], y=[baseline_y[3]], mode='markers',
+                                marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU South'))
+
+    # Plot Base EU West
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Base EU West']['value'], name='Base EU West',
+                            box_visible=True, line_color=color))
+    fig.add_trace(go.Scatter(x=['Base EU West'], y=[baseline_y[4]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline Base EU West'))
+
+    # Plot NoH2 EU West
+    if YEAR == '2030':
+        fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU West']['value'], name='No H2 Target EU West',
+                                box_visible=True, line_color=color))
+        fig.add_trace(go.Scatter(x=['No H2 Target EU West'], y=[baseline_y[5]], mode='markers',
+                                marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU West'))
+
+    # Plot Base EU East
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Base EU East']['value'], name='Base EU East',
+                            box_visible=True, line_color=color))
+    fig.add_trace(go.Scatter(x=['Base EU East'], y=[baseline_y[6]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline Base EU East'))
+
+    # Plot NoH2 EU East
+    if YEAR == '2030':
+        fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU East']['value'], name='No H2 Target EU East',
+                                box_visible=True, line_color=color))
+        fig.add_trace(go.Scatter(x=['No H2 Target EU East'], y=[baseline_y[7]], mode='markers',
+                                marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU East'))
+    
+
+     
+    fig.update_layout(
+        title={
+            'text': f'Violin Plot: Value Distribution of H2 {type} in ({YEAR})',
+            'font': {'size': 16}, 
+            
+        },
+
+        yaxis_title=f"H2 {type} [{unit}]",
+        yaxis_range=[0, None],
+        height=600,
+        width=1200,
+        legend=dict(orientation='h', x=0.5, y=1, xanchor='center', yanchor='bottom'),  # Adjust legend position
+        margin=dict(t=200, b=50)  # Adjust top and bottom margins to accommodate title and legend
+    )
+
+    # Show the figure
+    fig.show()
+
+    return(fig)
+
+
+
