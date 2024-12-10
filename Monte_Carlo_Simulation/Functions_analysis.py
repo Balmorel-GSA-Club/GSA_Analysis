@@ -14,6 +14,7 @@ from plotly.subplots import make_subplots
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.metrics import r2_score
+from io import StringIO
 
 #### Useful dictionnaries #####
 
@@ -829,7 +830,7 @@ def Violin_Setups_Europe(
 ):
     if type not in ["Green Capacity", "Blue Capacity", "Green Production", "Blue Production", "Storage", "Transmission Capacity", "Transmission Flow"]: 
         raise ValueError(f"Invalid type: {type}")
-    
+    print(df_H2_BASE_scen_EU_North)
     # Baseline values
     baseline_y = np.array([
         df_H2_tot_BASE_EU_North, df_H2_tot_NoH2_EU_North,
@@ -951,5 +952,405 @@ def Violin_Setups_Europe(
 
     return(fig)
 
+#Correlation Analysis
+#Function correlation outputs
+def Post_analysis(df_CAP_scen, df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, df_CAP, df_PRO_scen, df_H2_PRO_GREEN_scen, df_H2_PRO_GREEN_tot_BASE, df_PRO, scen, YEAR, Countries_from, type: str, type2 : str) :
+    if type2 =="Capacity" :
+    
+        df_ELEC_CAP = df_CAP_scen[(df_CAP_scen['COMMODITY']=='ELECTRICITY') & (df_CAP_scen['C'].isin(Countries_from)) & (df_CAP_scen['Y']==YEAR) & (df_CAP_scen['TECH_TYPE']==type)]
+        df_ELEC_CAP = df_ELEC_CAP.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_CAP = df_ELEC_CAP.sort_values(by=['scenarios'],ascending=True)
+        df_ELEC_CAP = df_ELEC_CAP.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_CAP = df_CAP[(df_CAP['COMMODITY']=='ELECTRICITY') & (df_CAP['C'].isin(Countries_from)) & (df_CAP['Y']==YEAR) & (df_CAP['TECH_TYPE']==type)]
+        df_BASE_ELEC_CAP_tot = df_BASE_ELEC_CAP['value'].sum()
 
+        BO = pd.concat([df_H2_CAP_GREEN_scen['value'], df_ELEC_CAP['value']], axis=1)
+        BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+        X = BO['Capacity [GW]'].values.reshape(-1, 1)
+        y = BO['Green H2 Capacity [GW]'].values
+
+    elif type2 =="Production" :
+        df_ELEC_PRO = df_PRO_scen[(df_PRO_scen['COMMODITY']=='ELECTRICITY') & (df_PRO_scen['C'].isin(Countries_from)) & (df_PRO_scen['Y']==YEAR) & (df_PRO_scen['TECH_TYPE']==type)]
+        df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'],ascending=True)
+        df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_PRO = df_PRO[(df_PRO['COMMODITY']=='ELECTRICITY') & (df_PRO['C'].isin(Countries_from)) & (df_PRO['Y']==YEAR) & (df_PRO['TECH_TYPE']==type)]
+        df_BASE_ELEC_PRO_tot = df_BASE_ELEC_PRO['value'].sum()
+        BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
+        BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+        X = BO['Production [TWh]'].values.reshape(-1, 1)
+        y = BO['Green H2 Production [TWh]'].values
+
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    fig = go.Figure()
+
+
+    if type2 =="Capacity" :
+        fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=BO['Green H2 Capacity [GW]'], mode='markers',showlegend=False))
+        fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=y_pred, mode='lines', name='Trendline', line=dict(color='red'),showlegend=False))
+
+        new_point_x = df_BASE_ELEC_CAP_tot
+        new_point_y = df_H2_CAP_GREEN_tot_BASE
+        print(new_point_x)
+    
+    elif type2 =="Production" :
+        fig.add_trace(go.Scatter(x=BO['Production [TWh]'], y=BO['Green H2 Production [TWh]'], mode='markers',showlegend=False))
+        fig.add_trace(go.Scatter(x=BO['Production [TWh]'], y=y_pred, mode='lines', name='Trendline', line=dict(color='red'),showlegend=False))
+
+        new_point_x = df_BASE_ELEC_PRO_tot
+        new_point_y = df_H2_PRO_GREEN_tot_BASE
+
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='yellow', size=10),
+        name='New Point',
+        showlegend=False
+    ))
+
+
+    if type2 =="Capacity" :
+        fig.update_layout(
+            title={
+                'text': f'R² = {r2:.2f}',
+                # 'text': f'Green H2 Capacity vs Offshore Wind Production in DK for 2050 <br>R² = {r2:.2f}',
+                'y': 0.84,  
+                'x': 0.5,  
+                'xanchor': 'center', 
+                'yanchor': 'top' 
+            },
+            xaxis_title= (f"{type} Capacity [GW]"),
+            yaxis_title="Green H2 Capacity [GW]",
+            width=600,
+            height=500
+        )
+
+        fig.show()
+
+    elif type2 =="Production" :
+        fig.update_layout(
+            title={
+                'text': f'R² = {r2:.2f}',
+                # 'text': f'Green H2 Capacity vs Offshore Wind Production in DK for 2050 <br>R² = {r2:.2f}',
+                'y': 0.84,  
+                'x': 0.5,  
+                'xanchor': 'center', 
+                'yanchor': 'top' 
+            },
+            xaxis_title= (f"{type} Production [TWh]"),
+            yaxis_title="Green H2 Production [TWh]",
+            width=600,
+            height=500
+        )
+
+        fig.show()
+
+
+
+#Correlation Analysis
+#Function to import the input data from the baseline
+def Import_input_data(input_data_baseline_file_path, sample_path, type: str):
+    
+    df = gt.Container(input_data_baseline_file_path)
+    df_CCS = pd.DataFrame(df.data["CCS_CO2CAPTEFF_G"].records)
+    df_DE = pd.DataFrame(df.data["DE"].records)
+    df_EMIPOL = pd.DataFrame(df.data["EMI_POL"].records)
+    df_FUELPRICE = pd.DataFrame(df.data["FUELPRICE"].records)
+    df_GDATA_categorical = pd.DataFrame(df.data["GDATA_categorical"].records)
+    df_GDATA_numerical = pd.DataFrame(df.data["GDATA_numerical"].records)
+    df_HYDROGEN_DH2 = pd.DataFrame(df.data["HYDROGEN_DH2"].records)
+    df_SUBTECHGROUPKPOT = pd.DataFrame(df.data["SUBTECHGROUPKPOT"].records)
+    df_XH2INVCOST = pd.DataFrame(df.data["XH2INVCOST"].records)
+    df_XINVCOST = pd.DataFrame(df.data["XINVCOST"].records)
+
+    scenario_data = {
+    'CCS_CO2CAPTEFF_G': df_CCS,
+    'DE': df_DE,
+    'EMI_POL': df_EMIPOL,
+    'FUELPRICE': df_FUELPRICE,
+    'GDATA_numerical': df_GDATA_numerical,
+    'GDATA_categorical': df_GDATA_categorical,
+    'HYDROGEN_DH2': df_HYDROGEN_DH2,
+    'SUBTECHGROUPKPOT': df_SUBTECHGROUPKPOT,
+    'XH2INVCOST': df_XH2INVCOST,
+    'XINVCOST': df_XINVCOST
+    }
+
+    with open(sample_path, 'r') as file:
+        sample_raw = file.read()
+        #print(content) 
+    df_sample = pd.read_csv(StringIO(sample_raw), header=None)
+    
+    if type == 'EU': 
+        df_sample.columns = [
+        "CO2_TAX","CO2_EFF","ELYS_ELEC_EFF","H2S_INVC","SMR_CCS_INVC","PV_INVC","ONS_WT_INVC","H2_OandM","SMR_CCS_OandM","H2_TRANS_INVC","ELEC_TRANS_INVC",
+        "IMPORT_H2_P","DH2_DEMAND_EAST","DH2_DEMAND_SOUTH","DH2_DEMAND_NORTH","DH2_DEMAND_WEST",
+        "DE_DEMAND_EAST","DE_DEMAND_SOUTH","DE_DEMAND_NORTH","DE_DEMAND_WEST","PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST","ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH",
+        "TRANS_DEMAND_NORTH","TRANS_DEMAND_SOUTH", "TRANS_DEMAND_EAST", "TRANS_DEMAND_WEST", "NATGAS_P" ]
+    elif type == 'DK': 
+        df_sample.columns = ["CO2_TAX", "CO2_EFF", "ELYS_ELEC_EFF", "H2S_INVC", "SMR_CCS_INVC", "PV_INVC", "ONS_WT_INVC", 
+                             "H2_OandM", "SMR_CCS_OandM", "H2_TRANS_INVC", "ELEC_TRANS_INVC", "IMPORT_H2_P", "DH2_DEMAND_Rest", 
+                             "DH2_DEMAND_DK", "DH2_DEMAND_DE", "DE_DEMAND_Rest", "DE_DEMAND_DK", "DE_DEMAND_DE", "PV_LIMIT_NORTH", 
+                             "PV_LIMIT_SOUTH", "ONS_LIMIT_DK", "ONS_LIMIT_DE", "ONS_LIMIT_NORTH", "ONS_LIMIT_SOUTH", "TRANS_DEMAND_REST", "TRANS_DEMAND_DE", "NATGAS_P"]
+
+    return scenario_data, df_sample
+
+#scenario data = input baseline data 
+#Function to re-create the input data of the scenarios for some parameters of the GSA
+def Sample_input_data(scenario_data, sample, YEAR): 
+
+    df_NGAS_Price = scenario_data["FUELPRICE"]
+    NatGas_Price = df_NGAS_Price[(df_NGAS_Price["FFF"]=="NATGAS") &  (df_NGAS_Price['YYY']==YEAR) & (df_NGAS_Price['AAA']=='FinA')]
+    NatGas_Price_base = NatGas_Price.iloc[0]['value'] #Natural gas price baseline
+    NatGas_Price_scenario = NatGas_Price_base * sample['NATGAS_P'] #Natural gas price all scenarios
+
+    df_CO2_tax = scenario_data["EMI_POL"]
+    CO2_tax = df_CO2_tax[(df_CO2_tax['YYY']==YEAR) & (df_CO2_tax['CCCRRRAAA']=='DENMARK')]
+    CO2_tax_base = CO2_tax.iloc[0]['value'] #CO2 tax baseline
+    CO2_Tax_scenario = CO2_tax_base * sample['CO2_TAX'] #CO2 tax all scenarios
+
+    df_SMR_CCS_INVC = scenario_data["GDATA_numerical"]
+    SMR_CCS_INVC = df_SMR_CCS_INVC[(df_SMR_CCS_INVC['GGG'].str.contains("GNR_STEAM-REFORMING-CCS")) & (df_SMR_CCS_INVC['GDATASET']=='GDINVCOST0')]
+    SMR_CCS_INVC_base = SMR_CCS_INVC.iloc[0]['value'] 
+    SMR_CCS_INVC_scenario = SMR_CCS_INVC_base * sample['SMR_CCS_INVC'] 
+
+    return NatGas_Price_base, NatGas_Price_scenario, CO2_tax_base, CO2_Tax_scenario, SMR_CCS_INVC_base, SMR_CCS_INVC_scenario
+
+#Functions to plot correlation
+def Post_analysis_Natgas(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, NatGas_Price_base, NatGas_Price_scenario, type : str) :
+    
+    BO = pd.concat([df_H2_CAP_GREEN_scen['value'], NatGas_Price_scenario], axis=1)
+    BO = BO.dropna() 
+    #print(BO)
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=BO['Green H2 Capacity [GW]'], mode='markers',showlegend=False))
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=y_pred, mode='lines', name='Trendline', line=dict(color='red'),showlegend=False))
+
+    new_point_x =  NatGas_Price_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+    #print(new_point_x)
+    
+    
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='yellow', size=10),
+        name='New Point',
+        showlegend=False
+    ))
+
+
+    fig.update_layout(
+        title={
+            'text': f'R² = {r2:.2f}',
+            # 'text': f'Green H2 Capacity vs Offshore Wind Production in DK for 2050 <br>R² = {r2:.2f}',
+            'y': 0.84,  
+            'x': 0.5,  
+            'xanchor': 'center', 
+            'yanchor': 'top' 
+        },
+        xaxis_title= "Natural gas price [€/GJ]",
+        yaxis_title=f"Green H2{type}",
+        width=600,
+        height=500
+    )
+
+    fig.show()
+
+def Post_analysis_CO2_tax(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, CO2_tax_base, CO2_Tax_scenario, type : str) :
+    
+    BO = pd.concat([df_H2_CAP_GREEN_scen['value'], CO2_Tax_scenario], axis=1)
+    BO = BO.dropna() 
+    #print(BO)
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=BO['Green H2 Capacity [GW]'], mode='markers',showlegend=False))
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=y_pred, mode='lines', name='Trendline', line=dict(color='red'),showlegend=False))
+
+    new_point_x =  CO2_tax_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+    #print(new_point_x)
+    
+    
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='yellow', size=10),
+        name='New Point',
+        showlegend=False
+    ))
+
+
+    fig.update_layout(
+        title={
+            'text': f'R² = {r2:.2f}',
+            # 'text': f'Green H2 Capacity vs Offshore Wind Production in DK for 2050 <br>R² = {r2:.2f}',
+            'y': 0.84,  
+            'x': 0.5,  
+            'xanchor': 'center', 
+            'yanchor': 'top' 
+        },
+        xaxis_title= "CO2 tax price [€/ ton CO2]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500
+    )
+
+    fig.show()
+
+def Post_analysis_SMR_CCS_INVC(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, SMR_CCS_INVC_base, SMR_CCS_INVC_scenario, type : str) :
+    
+    BO = pd.concat([df_H2_CAP_GREEN_scen['value'], SMR_CCS_INVC_scenario], axis=1)
+    BO = BO.dropna() 
+    #print(BO)
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=BO['Green H2 Capacity [GW]'], mode='markers',showlegend=False))
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=y_pred, mode='lines', name='Trendline', line=dict(color='red'),showlegend=False))
+
+    new_point_x =  SMR_CCS_INVC_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+    #print(new_point_x)
+    
+    
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='yellow', size=10),
+        name='New Point',
+        showlegend=False
+    ))
+
+
+    fig.update_layout(
+        title={
+            'text': f'R² = {r2:.2f}',
+            # 'text': f'Green H2 Capacity vs Offshore Wind Production in DK for 2050 <br>R² = {r2:.2f}',
+            'y': 0.84,  
+            'x': 0.5,  
+            'xanchor': 'center', 
+            'yanchor': 'top' 
+        },
+        xaxis_title= "SMR CCS Investement Cost [M€/MW]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500
+    )
+
+    fig.show()
+
+                
+
+
+
+def Appendix_Violin_Setups_Europe(
+    df_H2_BASE_scen_all, df_H2_NoH2_scen_all, df_H2_tot_BASE_all, df_H2_tot_NoH2_all,
+    YEAR, type: str, Countries
+):
+    if type not in ["Green Capacity", "Blue Capacity", "Green Production", "Blue Production", "Storage", "Transmission Capacity", "Transmission Flow"]: 
+        raise ValueError(f"Invalid type: {type}")
+
+    # Initialize baseline values array
+    baseline_y = np.array(
+    [value for i in range(len(Countries)) for value in (df_H2_tot_BASE_all[i], df_H2_tot_NoH2_all[i])])
+
+    # Determine color and unit
+    if type in ["Green Capacity", "Green Production"]:
+        color = 'green'
+    elif type in ["Blue Capacity", "Blue Production"]:
+        color = 'blue'
+    elif type == "Storage":
+        color = 'orange'
+        unit = 'TWh'
+    elif type == "Transmission Capacity":
+        color = 'red'
+    elif type == "Transmission Flow":
+        color = 'red'
+
+    if "Capacity" in type:
+        unit = 'GW'
+    elif "Production" in type or "Flow" in type:
+        unit = 'TWh'
+
+    # Create plot
+    fig = go.Figure()
+
+    # Loop through countries to dynamically create plots
+    for i, country in enumerate(Countries):
+        # Add categories for each country
+        df_H2_BASE_scen_all[i]['category'] = f'Base {country}'
+        df_H2_NoH2_scen_all[i]['category'] = f'No H2 Target {country}'
+
+        # Combine dataframes for plotting
+        combined_df = pd.concat([df_H2_BASE_scen_all[i], df_H2_NoH2_scen_all[i]])
+
+        # Plot Base Country
+        fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == f'Base {country}']['value'], 
+                                name=f'Base {country}', box_visible=True, line_color=color))
+        fig.add_trace(go.Scatter(x=[f'Base {country}'], y=[baseline_y[i*2]], mode='markers', 
+                                marker=dict(color='#3C3D37', size=10), name=f'Baseline Base {country}'))
+
+        # Plot NoH2 Country
+        if YEAR == '2030':
+            fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == f'No H2 Target {country}']['value'], 
+                                    name=f'No H2 Target {country}', box_visible=True, line_color=color))
+            fig.add_trace(go.Scatter(x=[f'No H2 Target {country}'], y=[baseline_y[i*2 + 1]], mode='markers', 
+                                    marker=dict(color='#3C3D37', size=10), name=f'Baseline No H2 Target {country}'))
+
+    # Update layout
+    fig.update_layout(
+        title={
+            'text': f'Violin Plot: Value Distribution of H2 {type} in ({YEAR})',
+            'font': {'size': 16}, 
+        },
+        yaxis_title=f"H2 {type} [{unit}]",
+        yaxis_range=[0, None],
+        height=600,
+        width=1200,
+        legend=dict(orientation='h', x=0.5, y=1, xanchor='center', yanchor='bottom'),  # Adjust legend position
+        margin=dict(t=350, b=50)  # Adjust top and bottom margins to accommodate title and legend
+    )
+
+    # Show the figure
+    fig.show()
+
+    return fig
 
