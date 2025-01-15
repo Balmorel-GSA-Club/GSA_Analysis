@@ -9,12 +9,13 @@ import os
 import seaborn as sns
 import plotly.express as px
 import plotly.graph_objects as go
-import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.metrics import r2_score
 from io import StringIO
+import matplotlib.cm as cm
+import plotly.express as px 
 
 #### Useful dictionnaries #####
 
@@ -741,7 +742,7 @@ def BoxPlot_Transmission(dict_df_XH2_TO_BASE, dict_df_XH2_TO_scen, Countries_fro
         darkened_rgb = tuple([c * factor for c in rgb])  # Darken by scaling each component
         return darkened_rgb
 
-    colormap = plt.cm.viridis  # You can use other colormaps like 'plasma', 'coolwarm', etc.
+    colormap = plt.cm.Portland  # You can use other colormaps like 'plasma', 'coolwarm', etc.
     num_colors = len(neighbors)
     base_colors = [colormap(i / num_colors) for i in range(num_colors)]
 
@@ -952,8 +953,169 @@ def Violin_Setups_Europe(
 
     return(fig)
 
-#Correlation Analysis
-#Function correlation outputs
+
+#Function to plot violin graphs in the Appendix
+def Appendix_Violin_Setups_Europe(
+    df_H2_BASE_scen_all, df_H2_NoH2_scen_all, df_H2_tot_BASE_all, df_H2_tot_NoH2_all,
+    YEAR, type: str, Countries
+):
+    if type not in ["Green Capacity", "Blue Capacity", "Green Production", "Blue Production", "Storage", "Transmission Capacity", "Transmission Flow"]: 
+        raise ValueError(f"Invalid type: {type}")
+
+    # Initialize baseline values array
+    baseline_y = np.array(
+    [value for i in range(len(Countries)) for value in (df_H2_tot_BASE_all[i], df_H2_tot_NoH2_all[i])])
+
+    # Determine color and unit
+    if type in ["Green Capacity", "Green Production"]:
+        color = 'green'
+    elif type in ["Blue Capacity", "Blue Production"]:
+        color = 'blue'
+    elif type == "Storage":
+        color = 'orange'
+        unit = 'TWh'
+    elif type == "Transmission Capacity":
+        color = 'red'
+    elif type == "Transmission Flow":
+        color = 'red'
+
+    if "Capacity" in type:
+        unit = 'GW'
+    elif "Production" in type or "Flow" in type:
+        unit = 'TWh'
+
+    # Create plot
+    fig = go.Figure()
+
+    # Loop through countries to dynamically create plots
+    for i, country in enumerate(Countries):
+        # Add categories for each country
+        df_H2_BASE_scen_all[i]['category'] = f'Base {country}'
+        df_H2_NoH2_scen_all[i]['category'] = f'No H2 Target {country}'
+
+        # Combine dataframes for plotting
+        combined_df = pd.concat([df_H2_BASE_scen_all[i], df_H2_NoH2_scen_all[i]])
+
+        # Plot Base Country
+        fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == f'Base {country}']['value'], 
+                                name=f'Base {country}', box_visible=True, line_color=color))
+        fig.add_trace(go.Scatter(x=[f'Base {country}'], y=[baseline_y[i*2]], mode='markers', 
+                                marker=dict(color='#3C3D37', size=10), name=f'Baseline Base {country}'))
+
+        # Plot NoH2 Country
+        if YEAR == '2030':
+            fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == f'No H2 Target {country}']['value'], 
+                                    name=f'No H2 Target {country}', box_visible=True, line_color=color))
+            fig.add_trace(go.Scatter(x=[f'No H2 Target {country}'], y=[baseline_y[i*2 + 1]], mode='markers', 
+                                    marker=dict(color='#3C3D37', size=10), name=f'Baseline No H2 Target {country}'))
+
+    # Update layout
+    fig.update_layout(
+        title={
+            'text': f'Violin Plot: Value Distribution of H2 {type} in ({YEAR})',
+            'font': {'size': 16}, 
+        },
+        yaxis_title=f"H2 {type} [{unit}]",
+        yaxis_range=[0, None],
+        height=600,
+        width=1200,
+        legend=dict(orientation='h', x=0.5, y=1, xanchor='center', yanchor='bottom'),  # Adjust legend position
+        margin=dict(t=350, b=50)  # Adjust top and bottom margins to accommodate title and legend
+    )
+
+    # Show the figure
+    fig.show()
+
+    return fig
+
+
+
+######Correlation Analysis########
+#Function to import the input data from the baseline
+def Import_input_data(input_data_baseline_file_path, sample_path, type: str):
+    
+    df = gt.Container(input_data_baseline_file_path)
+    df_CCS = pd.DataFrame(df.data["CCS_CO2CAPTEFF_G"].records)
+    df_DE = pd.DataFrame(df.data["DE"].records)
+    df_EMIPOL = pd.DataFrame(df.data["EMI_POL"].records)
+    df_FUELPRICE = pd.DataFrame(df.data["FUELPRICE"].records)
+    df_GDATA_categorical = pd.DataFrame(df.data["GDATA_categorical"].records)
+    df_GDATA_numerical = pd.DataFrame(df.data["GDATA_numerical"].records)
+    df_HYDROGEN_DH2 = pd.DataFrame(df.data["HYDROGEN_DH2"].records)
+    df_SUBTECHGROUPKPOT = pd.DataFrame(df.data["SUBTECHGROUPKPOT"].records)
+    df_XH2INVCOST = pd.DataFrame(df.data["XH2INVCOST"].records)
+    df_XINVCOST = pd.DataFrame(df.data["XINVCOST"].records)
+
+    scenario_data = {
+    'CCS_CO2CAPTEFF_G': df_CCS,
+    'DE': df_DE,
+    'EMI_POL': df_EMIPOL,
+    'FUELPRICE': df_FUELPRICE,
+    'GDATA_numerical': df_GDATA_numerical,
+    'GDATA_categorical': df_GDATA_categorical,
+    'HYDROGEN_DH2': df_HYDROGEN_DH2,
+    'SUBTECHGROUPKPOT': df_SUBTECHGROUPKPOT,
+    'XH2INVCOST': df_XH2INVCOST,
+    'XINVCOST': df_XINVCOST
+    }
+
+    with open(sample_path, 'r') as file:
+        sample_raw = file.read()
+        #print(content) 
+    df_sample = pd.read_csv(StringIO(sample_raw), header=None)
+    
+    if type == 'EU': 
+        df_sample.columns = [
+        "CO2_TAX","CO2_EFF","ELYS_ELEC_EFF","H2S_INVC","SMR_CCS_INVC","PV_INVC","ONS_WT_INVC","H2_OandM","SMR_CCS_OandM","H2_TRANS_INVC","ELEC_TRANS_INVC",
+        "IMPORT_H2_P","DH2_DEMAND_EAST","DH2_DEMAND_SOUTH","DH2_DEMAND_NORTH","DH2_DEMAND_WEST",
+        "DE_DEMAND_EAST","DE_DEMAND_SOUTH","DE_DEMAND_NORTH","DE_DEMAND_WEST","PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST","ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH",
+        "TRANS_DEMAND_NORTH","TRANS_DEMAND_SOUTH", "TRANS_DEMAND_EAST", "TRANS_DEMAND_WEST", "NATGAS_P" ]
+    elif type == 'DK': 
+        df_sample.columns = ["CO2_TAX", "CO2_EFF", "ELYS_ELEC_EFF", "H2S_INVC", "SMR_CCS_INVC", "PV_INVC", "ONS_WT_INVC", 
+                             "H2_OandM", "SMR_CCS_OandM", "H2_TRANS_INVC", "ELEC_TRANS_INVC", "IMPORT_H2_P", "DH2_DEMAND_Rest", 
+                             "DH2_DEMAND_DK", "DH2_DEMAND_DE", "DE_DEMAND_Rest", "DE_DEMAND_DK", "DE_DEMAND_DE", "PV_LIMIT_NORTH", 
+                             "PV_LIMIT_SOUTH", "ONS_LIMIT_DK", "ONS_LIMIT_DE", "ONS_LIMIT_NORTH", "ONS_LIMIT_SOUTH", "TRANS_DEMAND_REST", "TRANS_DEMAND_DE", "NATGAS_P"]
+
+    return scenario_data, df_sample
+
+#Function to re-create the input data of the scenarios for some parameters of the GSA
+def Sample_input_data(scenario_data, sample, YEAR): 
+
+    df_NGAS_Price = scenario_data["FUELPRICE"]
+    NatGas_Price = df_NGAS_Price[(df_NGAS_Price["FFF"]=="NATGAS") &  (df_NGAS_Price['YYY']==YEAR) & (df_NGAS_Price['AAA']=='FinA')]
+    NatGas_Price_base = NatGas_Price.iloc[0]['value'] #Natural gas price baseline
+    NatGas_Price_scenario = NatGas_Price_base * sample['NATGAS_P'] #Natural gas price all scenarios
+
+    df_CO2_tax = scenario_data["EMI_POL"]
+    CO2_tax = df_CO2_tax[(df_CO2_tax['YYY']==YEAR) & (df_CO2_tax['CCCRRRAAA']=='DENMARK')]
+    CO2_tax_base = CO2_tax.iloc[0]['value'] #CO2 tax baseline
+    CO2_Tax_scenario = CO2_tax_base * sample['CO2_TAX'] #CO2 tax all scenarios
+
+    df_SMR_CCS_INVC = scenario_data["GDATA_numerical"]
+    SMR_CCS_INVC = df_SMR_CCS_INVC[(df_SMR_CCS_INVC['GGG'].str.contains("GNR_STEAM-REFORMING-CCS")) & (df_SMR_CCS_INVC['GDATASET']=='GDINVCOST0')]
+    SMR_CCS_INVC_base = SMR_CCS_INVC.iloc[0]['value'] 
+    SMR_CCS_INVC_scenario = SMR_CCS_INVC_base * sample['SMR_CCS_INVC'] 
+
+    return NatGas_Price_base, NatGas_Price_scenario, CO2_tax_base, CO2_Tax_scenario, SMR_CCS_INVC_base, SMR_CCS_INVC_scenario
+
+#Function to exctract KPOT (ongoing)
+def Sample_input_data_additional_test(scenario_data, sample, YEAR, Countries_from): 
+    df_KPOT = scenario_data["SUBTECHGROUPKPOT"]
+    Subtechgroup_KPOT_SolarPV_North = df_KPOT[(df_KPOT["TECH_GROUP"]=="SOLARPV") & (df_KPOT['CCCRRRAAA'].isin(['DK1','DK2','EE','FIN','LT','LV','NO1','NO2','NO3','NO4','NO5','SE1','SE2','SE3','SE4']))]
+    KPOT_SolarPV_North_base = Subtechgroup_KPOT_SolarPV_North['value'].sum()
+    KPOT_SolarPV_North_scenario = KPOT_SolarPV_North_base *sample['PV_LIMIT_NORTH']
+
+    Subtechgroup_KPOT_WINDONS_South = df_KPOT[(df_KPOT["TECH_GROUP"]=="WIND-ON") & (df_KPOT['CCCRRRAAA'].isin(['IT','ES','PT','SL','ME','HR','AL','RS','MK','GR','BA','MT','CY']))]
+    KPOT_WINDONS_South_base = Subtechgroup_KPOT_WINDONS_South['value'].sum()
+    KPOT_WINDONS_South_scenario = KPOT_WINDONS_South_base *sample['ONS_LIMIT_SOUTH']
+
+    
+
+    return KPOT_SolarPV_North_base, KPOT_SolarPV_North_scenario, KPOT_WINDONS_South_scenario, KPOT_WINDONS_South_base
+
+
+###Correlation Analysis###
+#Function correlation between H2 production/capacity and production/capacity of technology types
 def Post_analysis(df_CAP_scen, df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, df_CAP, df_PRO_scen, df_H2_PRO_GREEN_scen, df_H2_PRO_GREEN_tot_BASE, df_PRO, scen, YEAR, Countries_from, type: str, type2 : str) :
     if type2 =="Capacity" :
     
@@ -1011,7 +1173,7 @@ def Post_analysis(df_CAP_scen, df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, d
         y=[new_point_y],
         mode='markers',
         marker=dict(color='yellow', size=10),
-        name='New Point',
+        name='Baseline',
         showlegend=False
     ))
 
@@ -1052,78 +1214,7 @@ def Post_analysis(df_CAP_scen, df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, d
 
         fig.show()
 
-
-
-#Correlation Analysis
-#Function to import the input data from the baseline
-def Import_input_data(input_data_baseline_file_path, sample_path, type: str):
-    
-    df = gt.Container(input_data_baseline_file_path)
-    df_CCS = pd.DataFrame(df.data["CCS_CO2CAPTEFF_G"].records)
-    df_DE = pd.DataFrame(df.data["DE"].records)
-    df_EMIPOL = pd.DataFrame(df.data["EMI_POL"].records)
-    df_FUELPRICE = pd.DataFrame(df.data["FUELPRICE"].records)
-    df_GDATA_categorical = pd.DataFrame(df.data["GDATA_categorical"].records)
-    df_GDATA_numerical = pd.DataFrame(df.data["GDATA_numerical"].records)
-    df_HYDROGEN_DH2 = pd.DataFrame(df.data["HYDROGEN_DH2"].records)
-    df_SUBTECHGROUPKPOT = pd.DataFrame(df.data["SUBTECHGROUPKPOT"].records)
-    df_XH2INVCOST = pd.DataFrame(df.data["XH2INVCOST"].records)
-    df_XINVCOST = pd.DataFrame(df.data["XINVCOST"].records)
-
-    scenario_data = {
-    'CCS_CO2CAPTEFF_G': df_CCS,
-    'DE': df_DE,
-    'EMI_POL': df_EMIPOL,
-    'FUELPRICE': df_FUELPRICE,
-    'GDATA_numerical': df_GDATA_numerical,
-    'GDATA_categorical': df_GDATA_categorical,
-    'HYDROGEN_DH2': df_HYDROGEN_DH2,
-    'SUBTECHGROUPKPOT': df_SUBTECHGROUPKPOT,
-    'XH2INVCOST': df_XH2INVCOST,
-    'XINVCOST': df_XINVCOST
-    }
-
-    with open(sample_path, 'r') as file:
-        sample_raw = file.read()
-        #print(content) 
-    df_sample = pd.read_csv(StringIO(sample_raw), header=None)
-    
-    if type == 'EU': 
-        df_sample.columns = [
-        "CO2_TAX","CO2_EFF","ELYS_ELEC_EFF","H2S_INVC","SMR_CCS_INVC","PV_INVC","ONS_WT_INVC","H2_OandM","SMR_CCS_OandM","H2_TRANS_INVC","ELEC_TRANS_INVC",
-        "IMPORT_H2_P","DH2_DEMAND_EAST","DH2_DEMAND_SOUTH","DH2_DEMAND_NORTH","DH2_DEMAND_WEST",
-        "DE_DEMAND_EAST","DE_DEMAND_SOUTH","DE_DEMAND_NORTH","DE_DEMAND_WEST","PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST","ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH",
-        "TRANS_DEMAND_NORTH","TRANS_DEMAND_SOUTH", "TRANS_DEMAND_EAST", "TRANS_DEMAND_WEST", "NATGAS_P" ]
-    elif type == 'DK': 
-        df_sample.columns = ["CO2_TAX", "CO2_EFF", "ELYS_ELEC_EFF", "H2S_INVC", "SMR_CCS_INVC", "PV_INVC", "ONS_WT_INVC", 
-                             "H2_OandM", "SMR_CCS_OandM", "H2_TRANS_INVC", "ELEC_TRANS_INVC", "IMPORT_H2_P", "DH2_DEMAND_Rest", 
-                             "DH2_DEMAND_DK", "DH2_DEMAND_DE", "DE_DEMAND_Rest", "DE_DEMAND_DK", "DE_DEMAND_DE", "PV_LIMIT_NORTH", 
-                             "PV_LIMIT_SOUTH", "ONS_LIMIT_DK", "ONS_LIMIT_DE", "ONS_LIMIT_NORTH", "ONS_LIMIT_SOUTH", "TRANS_DEMAND_REST", "TRANS_DEMAND_DE", "NATGAS_P"]
-
-    return scenario_data, df_sample
-
-#scenario data = input baseline data 
-#Function to re-create the input data of the scenarios for some parameters of the GSA
-def Sample_input_data(scenario_data, sample, YEAR): 
-
-    df_NGAS_Price = scenario_data["FUELPRICE"]
-    NatGas_Price = df_NGAS_Price[(df_NGAS_Price["FFF"]=="NATGAS") &  (df_NGAS_Price['YYY']==YEAR) & (df_NGAS_Price['AAA']=='FinA')]
-    NatGas_Price_base = NatGas_Price.iloc[0]['value'] #Natural gas price baseline
-    NatGas_Price_scenario = NatGas_Price_base * sample['NATGAS_P'] #Natural gas price all scenarios
-
-    df_CO2_tax = scenario_data["EMI_POL"]
-    CO2_tax = df_CO2_tax[(df_CO2_tax['YYY']==YEAR) & (df_CO2_tax['CCCRRRAAA']=='DENMARK')]
-    CO2_tax_base = CO2_tax.iloc[0]['value'] #CO2 tax baseline
-    CO2_Tax_scenario = CO2_tax_base * sample['CO2_TAX'] #CO2 tax all scenarios
-
-    df_SMR_CCS_INVC = scenario_data["GDATA_numerical"]
-    SMR_CCS_INVC = df_SMR_CCS_INVC[(df_SMR_CCS_INVC['GGG'].str.contains("GNR_STEAM-REFORMING-CCS")) & (df_SMR_CCS_INVC['GDATASET']=='GDINVCOST0')]
-    SMR_CCS_INVC_base = SMR_CCS_INVC.iloc[0]['value'] 
-    SMR_CCS_INVC_scenario = SMR_CCS_INVC_base * sample['SMR_CCS_INVC'] 
-
-    return NatGas_Price_base, NatGas_Price_scenario, CO2_tax_base, CO2_Tax_scenario, SMR_CCS_INVC_base, SMR_CCS_INVC_scenario
-
-#Functions to plot correlation
+#Functions to plot correlation between H2 and respectively Natural gas, CO2 tax and SMR CCS INVC
 def Post_analysis_Natgas(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, NatGas_Price_base, NatGas_Price_scenario, type : str) :
     
     BO = pd.concat([df_H2_CAP_GREEN_scen['value'], NatGas_Price_scenario], axis=1)
@@ -1277,80 +1368,2066 @@ def Post_analysis_SMR_CCS_INVC(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, S
 
     fig.show()
 
-                
-
-
-
-def Appendix_Violin_Setups_Europe(
-    df_H2_BASE_scen_all, df_H2_NoH2_scen_all, df_H2_tot_BASE_all, df_H2_tot_NoH2_all,
-    YEAR, type: str, Countries
+def Post_analysis_allRE_H2(
+    df_CAP_scen, 
+    df_H2_CAP_GREEN_scen, 
+    df_H2_CAP_GREEN_tot_BASE, 
+    df_CAP, 
+    df_PRO_scen, 
+    df_H2_PRO_GREEN_scen, 
+    df_H2_PRO_GREEN_tot_BASE, 
+    df_PRO,
+    scen, 
+    YEAR, 
+    Countries_from, 
+    type: str, 
+    type2: str
 ):
-    if type not in ["Green Capacity", "Blue Capacity", "Green Production", "Blue Production", "Storage", "Transmission Capacity", "Transmission Flow"]: 
-        raise ValueError(f"Invalid type: {type}")
+    # Filter and process data based on `type2`
+    if type2 == "Capacity":
+        df_ELEC_CAP = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_CAP_scen['C'].isin(Countries_from)) &
+            (df_CAP_scen['Y'] == YEAR) &
+            (df_CAP_scen['TECH_TYPE'].isin (type))
+        ]
+        df_ELEC_CAP = df_ELEC_CAP.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_CAP = df_ELEC_CAP.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_CAP = df_ELEC_CAP.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_CAP = df_CAP[
+            (df_CAP['COMMODITY'] == 'ELECTRICITY') &
+            (df_CAP['C'].isin(Countries_from)) &
+            (df_CAP['Y'] == YEAR) &
+            (df_CAP['TECH_TYPE'] .isin (type))
+        ]
+        df_BASE_ELEC_CAP_tot = df_BASE_ELEC_CAP['value'].sum()
 
-    # Initialize baseline values array
-    baseline_y = np.array(
-    [value for i in range(len(Countries)) for value in (df_H2_tot_BASE_all[i], df_H2_tot_NoH2_all[i])])
+        BO = pd.concat([df_H2_CAP_GREEN_scen['value'], df_ELEC_CAP['value']], axis=1)
+        BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
 
-    # Determine color and unit
-    if type in ["Green Capacity", "Green Production"]:
-        color = 'green'
-    elif type in ["Blue Capacity", "Blue Production"]:
-        color = 'blue'
-    elif type == "Storage":
-        color = 'orange'
-        unit = 'TWh'
-    elif type == "Transmission Capacity":
-        color = 'red'
-    elif type == "Transmission Flow":
-        color = 'red'
+        X = BO['Capacity [GW]'].values
+        y = BO['Green H2 Capacity [GW]'].values
 
-    if "Capacity" in type:
-        unit = 'GW'
-    elif "Production" in type or "Flow" in type:
-        unit = 'TWh'
+    elif type2 == "Production":
+        df_ELEC_PRO = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_PRO_scen['C'].isin(Countries_from)) &
+            (df_PRO_scen['Y'] == YEAR) &
+            (df_PRO_scen['TECH_TYPE'].isin (type))
+        ]
+        df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_PRO = df_PRO[
+            (df_PRO['COMMODITY'] == 'ELECTRICITY') &
+            (df_PRO['C'].isin(Countries_from)) &
+            (df_PRO['Y'] == YEAR) &
+            (df_PRO['TECH_TYPE'].isin (type))
+        ]
+        df_BASE_ELEC_PRO_tot = df_BASE_ELEC_PRO['value'].sum()
+        BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
+        BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
 
-    # Create plot
+        X = BO['Production [TWh]'].values
+        y = BO['Green H2 Production [TWh]'].values
+
+        df_ELEC_PRO_SOLARPV= df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_PRO_scen['C'].isin(Countries_from)) &
+            (df_PRO_scen['Y'] == YEAR) &
+            (df_PRO_scen['TECH_TYPE']== 'SOLAR-PV')]
+        df_ELEC_PRO_SOLARPV = df_ELEC_PRO_SOLARPV.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_PRO_SOLARPV = df_ELEC_PRO_SOLARPV.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_PRO_SOLARPV = df_ELEC_PRO_SOLARPV.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+
+    # Creating the plot
     fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=X, y=y, mode='markers', 
+        marker=dict(color=df_ELEC_PRO_SOLARPV['value'], colorscale='Portland', size=8, showscale=True,
+                    colorbar=dict(title="Solar PV production [TWh]", len=0.6)),
+                    showlegend=False
+    )),
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
 
-    # Loop through countries to dynamically create plots
-    for i, country in enumerate(Countries):
-        # Add categories for each country
-        df_H2_BASE_scen_all[i]['category'] = f'Base {country}'
-        df_H2_NoH2_scen_all[i]['category'] = f'No H2 Target {country}'
+    
 
-        # Combine dataframes for plotting
-        combined_df = pd.concat([df_H2_BASE_scen_all[i], df_H2_NoH2_scen_all[i]])
+    # Plot the new point
+    new_point_x = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
+    new_point_y = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
 
-        # Plot Base Country
-        fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == f'Base {country}']['value'], 
-                                name=f'Base {country}', box_visible=True, line_color=color))
-        fig.add_trace(go.Scatter(x=[f'Base {country}'], y=[baseline_y[i*2]], mode='markers', 
-                                marker=dict(color='#3C3D37', size=10), name=f'Baseline Base {country}'))
-
-        # Plot NoH2 Country
-        if YEAR == '2030':
-            fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == f'No H2 Target {country}']['value'], 
-                                    name=f'No H2 Target {country}', box_visible=True, line_color=color))
-            fig.add_trace(go.Scatter(x=[f'No H2 Target {country}'], y=[baseline_y[i*2 + 1]], mode='markers', 
-                                    marker=dict(color='#3C3D37', size=10), name=f'Baseline No H2 Target {country}'))
+    fig.add_trace(go.Scatter(
+        x=[new_point_x], y=[new_point_y],
+        mode='markers', marker=dict(color='black', size=10),
+        name='Baseline'
+    ))
 
     # Update layout
     fig.update_layout(
-        title={
-            'text': f'Violin Plot: Value Distribution of H2 {type} in ({YEAR})',
-            'font': {'size': 16}, 
-        },
-        yaxis_title=f"H2 {type} [{unit}]",
-        yaxis_range=[0, None],
+        title=f'R² = {r2:.2f}',
+        xaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"{type} {type2} [TWh]",
+        yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
+        width=800,
         height=600,
-        width=1200,
-        legend=dict(orientation='h', x=0.5, y=1, xanchor='center', yanchor='bottom'),  # Adjust legend position
-        margin=dict(t=350, b=50)  # Adjust top and bottom margins to accommodate title and legend
     )
-
-    # Show the figure
     fig.show()
 
-    return fig
+
+#Color map Natural gas
+def Post_analysis_colormap_allRE_ng(
+    df_CAP_scen, 
+    df_H2_CAP_GREEN_scen, 
+    df_H2_CAP_GREEN_tot_BASE, 
+    df_CAP, 
+    df_PRO_scen, 
+    df_H2_PRO_GREEN_scen, 
+    df_H2_PRO_GREEN_tot_BASE, 
+    df_PRO, 
+    NatGas_Price_scenario,
+    scen, 
+    YEAR, 
+    Countries_from, 
+    type: str, 
+    type2: str
+):
+    # Filter and process data based on `type2`
+    if type2 == "Capacity":
+        df_ELEC_CAP = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_CAP_scen['C'].isin(Countries_from)) &
+            (df_CAP_scen['Y'] == YEAR) &
+            (df_CAP_scen['TECH_TYPE'].isin (type))
+        ]
+        df_ELEC_CAP = df_ELEC_CAP.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_CAP = df_ELEC_CAP.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_CAP = df_ELEC_CAP.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_CAP = df_CAP[
+            (df_CAP['COMMODITY'] == 'ELECTRICITY') &
+            (df_CAP['C'].isin(Countries_from)) &
+            (df_CAP['Y'] == YEAR) &
+            (df_CAP['TECH_TYPE'] .isin (type))
+        ]
+        df_BASE_ELEC_CAP_tot = df_BASE_ELEC_CAP['value'].sum()
+
+        BO = pd.concat([df_H2_CAP_GREEN_scen['value'], df_ELEC_CAP['value']], axis=1)
+        BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+        X = BO['Capacity [GW]'].values
+        y = BO['Green H2 Capacity [GW]'].values
+
+    elif type2 == "Production":
+        df_ELEC_PRO = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_PRO_scen['C'].isin(Countries_from)) &
+            (df_PRO_scen['Y'] == YEAR) &
+            (df_PRO_scen['TECH_TYPE'].isin (type))
+        ]
+        df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_PRO = df_PRO[
+            (df_PRO['COMMODITY'] == 'ELECTRICITY') &
+            (df_PRO['C'].isin(Countries_from)) &
+            (df_PRO['Y'] == YEAR) &
+            (df_PRO['TECH_TYPE'].isin (type))
+        ]
+        df_BASE_ELEC_PRO_tot = df_BASE_ELEC_PRO['value'].sum()
+        BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
+        BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+        X = BO['Production [TWh]'].values
+        y = BO['Green H2 Production [TWh]'].values
+
+    # Creating the plot
+    fig = go.Figure()
+
+   
+    # Assign colors based on price categories
+    fig.add_trace(go.Scatter(
+        x=X, y=y, mode='markers', 
+        marker=dict(color=NatGas_Price_scenario, colorscale='Portland', size=8, showscale=True,
+                    colorbar=dict(title="Natural gas price [€/GJ]", len=0.6)),
+                    showlegend=False
+    )), 
+
+
+
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # Plot the new point
+    new_point_x = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
+    new_point_y = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
+
+    fig.add_trace(go.Scatter(
+        x=[new_point_x], y=[new_point_y],
+        mode='markers', marker=dict(color='black', size=10),
+        name='Baseline'
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"{type} {type2} [TWh]",
+        yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
+        width=800,
+        height=600,
+    )
+    fig.show()
+
+def Post_analysis_colormap_ng(
+    df_CAP_scen, 
+    df_H2_CAP_GREEN_scen, 
+    df_H2_CAP_GREEN_tot_BASE, 
+    df_CAP, 
+    df_PRO_scen, 
+    df_H2_PRO_GREEN_scen, 
+    df_H2_PRO_GREEN_tot_BASE, 
+    df_PRO,
+    NatGas_Price_scenario,  
+    scen, 
+    YEAR, 
+    Countries_from, 
+    type: str, 
+    type2: str
+):
+    # Filter and process data based on `type2`
+    if type2 == "Capacity":
+        df_ELEC_CAP = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_CAP_scen['C'].isin(Countries_from)) & 
+            (df_CAP_scen['Y'] == YEAR) & 
+            (df_CAP_scen['TECH_TYPE'] == type)
+        ]
+        df_ELEC_CAP = df_ELEC_CAP.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_CAP = df_ELEC_CAP.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_CAP = df_ELEC_CAP.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_CAP = df_CAP[
+            (df_CAP['COMMODITY'] == 'ELECTRICITY') & 
+            (df_CAP['C'].isin(Countries_from)) & 
+            (df_CAP['Y'] == YEAR) & 
+            (df_CAP['TECH_TYPE'] == type)
+        ]
+        df_BASE_ELEC_CAP_tot = df_BASE_ELEC_CAP['value'].sum()
+
+        BO = pd.concat([df_H2_CAP_GREEN_scen['value'], df_ELEC_CAP['value']], axis=1)
+        BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+        X = BO['Capacity [GW]'].values
+        y = BO['Green H2 Capacity [GW]'].values
+
+    elif type2 == "Production":
+        df_ELEC_PRO = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO_scen['C'].isin(Countries_from)) & 
+            (df_PRO_scen['Y'] == YEAR) & 
+            (df_PRO_scen['TECH_TYPE'] == type)
+        ]
+        df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_PRO = df_PRO[
+            (df_PRO['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO['C'].isin(Countries_from)) & 
+            (df_PRO['Y'] == YEAR) & 
+            (df_PRO['TECH_TYPE'] == type)
+        ]
+        df_BASE_ELEC_PRO_tot = df_BASE_ELEC_PRO['value'].sum()
+        BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
+        BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+        X = BO['Production [TWh]'].values
+        y = BO['Green H2 Production [TWh]'].values
+
+
+
+    # Creating the plot
+    fig = go.Figure()
+
+    
+    # Assign colors based on price categories
+    fig.add_trace(go.Scatter(
+        x=X, y=y, mode='markers', 
+        marker=dict(color=NatGas_Price_scenario, colorscale='Portland', size=8, showscale=True,
+                    colorbar=dict(title="Natural gas price [€/GJ]", len=0.6)),
+                    showlegend=False
+    )), 
+    
+
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # Plot the new point
+    new_point_x = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
+    new_point_y = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
+
+    fig.add_trace(go.Scatter(
+        x=[new_point_x], y=[new_point_y],
+        mode='markers', marker=dict(color='Black', size=10),
+        name='Baseline'
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"{type} {type2} [TWh]",
+        yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
+        width=800,
+        height=600,
+        coloraxis_colorbar=dict(title="Capacity [GW]" if type2 == "Capacity" else "Production [TWh]")
+    )
+
+    fig.show()
+
+def Post_analysis_CO2_tax_colormap_ng(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, CO2_tax_base, CO2_Tax_scenario, df_PRO_scen,NatGas_Price_scenario, type: str):
+
+    BO = pd.concat([df_H2_CAP_GREEN_scen['value'], CO2_Tax_scenario], axis=1)
+    BO = BO.dropna() 
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+    # Creating the plot
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y, mode='markers',
+        marker=dict(
+            color= NatGas_Price_scenario,
+            colorscale='Portland',  # You can change 'Portland' to another colorscale if desired
+            size=8, 
+            showscale=True,  # Display the color scale on the side
+            colorbar=dict(title="Natural gas price [€/GJ]", len=0.6)  # Title for the color scale
+        ), showlegend=False
+    ))
+    # Linear regression
+    X = CO2_Tax_scenario.values.reshape(-1, 1)
+    y = df_H2_CAP_GREEN_scen['value'].values
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # New point
+    new_point_x = CO2_tax_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+
+    # Add the new point
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='black', size=10),
+        name='Baseline',
+        showlegend=True
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title="CO2 tax price [€/ton CO2]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500
+    )
+
+    # Show the plot
+    fig.show()
+
+def Post_analysis_SMR_CCS_INVC_colormap_ng(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, SMR_CCS_INVC_base, SMR_CCS_INVC_scenario, df_PRO_scen,NatGas_Price_scenario, type: str):
+
+    BO = pd.concat([df_H2_CAP_GREEN_scen['value'], SMR_CCS_INVC_scenario], axis=1)
+    BO = BO.dropna() 
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+    # Creating the plot
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y, mode='markers',
+        marker=dict(
+            color= NatGas_Price_scenario,
+            colorscale='Portland',  # You can change 'Portland' to another colorscale if desired
+            size=8, 
+            showscale=True,  # Display the color scale on the side
+            colorbar=dict(title="Natural gas price [€/GJ]", len=0.6)  # Title for the color scale
+        ), showlegend=False
+    ))
+    # Linear regression
+    X = SMR_CCS_INVC_scenario.values.reshape(-1, 1)
+    y = df_H2_CAP_GREEN_scen['value'].values
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # New point
+    new_point_x = SMR_CCS_INVC_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+
+    # Add the new point
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='black', size=10),
+        name='Baseline',
+        showlegend=True
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title="SMR CCS Investment Cost [M€/MW]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500
+    )
+
+    # Show the plot
+    fig.show()
+
+#Colormaps Solar PV production
+def Post_analysis_colormap_PV(
+    df_CAP_scen, 
+    df_H2_CAP_GREEN_scen, 
+    df_H2_CAP_GREEN_tot_BASE, 
+    df_CAP, 
+    df_PRO_scen, 
+    df_H2_PRO_GREEN_scen, 
+    df_H2_PRO_GREEN_tot_BASE, 
+    df_PRO,
+    NatGas_Price_scenario,  
+    scen, 
+    YEAR, 
+    Countries_from, 
+    type: str, 
+    type2: str
+):
+    # Filter and process data based on `type2`
+    if type2 == "Capacity":
+        df_ELEC_CAP = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_CAP_scen['C'].isin(Countries_from)) & 
+            (df_CAP_scen['Y'] == YEAR) & 
+            (df_CAP_scen['TECH_TYPE'] == type)
+        ]
+        df_ELEC_CAP = df_ELEC_CAP.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_CAP = df_ELEC_CAP.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_CAP = df_ELEC_CAP.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_CAP = df_CAP[
+            (df_CAP['COMMODITY'] == 'ELECTRICITY') & 
+            (df_CAP['C'].isin(Countries_from)) & 
+            (df_CAP['Y'] == YEAR) & 
+            (df_CAP['TECH_TYPE'] == type)
+        ]
+        df_BASE_ELEC_CAP_tot = df_BASE_ELEC_CAP['value'].sum()
+
+        BO = pd.concat([df_H2_CAP_GREEN_scen['value'], df_ELEC_CAP['value']], axis=1)
+        BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+        X = BO['Capacity [GW]'].values
+        y = BO['Green H2 Capacity [GW]'].values
+
+    elif type2 == "Production":
+        df_ELEC_PRO = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO_scen['C'].isin(Countries_from)) & 
+            (df_PRO_scen['Y'] == YEAR) & 
+            (df_PRO_scen['TECH_TYPE'] == type)
+        ]
+        df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_PRO = df_PRO[
+            (df_PRO['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO['C'].isin(Countries_from)) & 
+            (df_PRO['Y'] == YEAR) & 
+            (df_PRO['TECH_TYPE'] == type)
+        ]
+        df_BASE_ELEC_PRO_tot = df_BASE_ELEC_PRO['value'].sum()
+        BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
+        BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+        X = BO['Production [TWh]'].values
+        y = BO['Green H2 Production [TWh]'].values
+
+
+
+    # Creating the plot
+    fig = go.Figure()
+
+
+    df_ELEC_PRO_PV = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO_scen['C'].isin(Countries_from)) & 
+            (df_PRO_scen['Y'] == YEAR) & 
+            (df_PRO_scen['TECH_TYPE'] == 'SOLAR-PV')]
+    df_ELEC_PRO_PV = df_ELEC_PRO_PV.groupby('scenarios')['value'].sum()
+    # Assign colors based on price categories
+    fig.add_trace(go.Scatter(
+        x=X, y=y, mode='markers', 
+        marker=dict(color=df_ELEC_PRO_PV, colorscale='Portland', size=8, showscale=True,
+                    colorbar=dict(title="Solar PV production [TWh]", len=0.6),
+        ),
+        showlegend=False
+    ))
+    
+
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # Plot the new point
+    new_point_x = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
+    new_point_y = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
+
+    fig.add_trace(go.Scatter(
+        x=[new_point_x], y=[new_point_y],
+        mode='markers', marker=dict(color='black', size=10),
+        name='Baseline'
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"{type} {type2} [TWh]",
+        yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
+        width=800,
+        height=600,
+        coloraxis_colorbar=dict(title="Capacity [GW]" if type2 == "Capacity" else "Production [TWh]")
+    )
+
+    fig.show()
+
+def Post_analysis_Natgas_colormap_PV(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, 
+                                      NatGas_Price_base, NatGas_Price_scenario, 
+                                      df_PRO_scen, Countries_from, YEAR, type : str):
+    
+    # Concatenate the two dataframes for Natural Gas Price and Green H2 Capacity
+    BO = pd.concat([df_H2_CAP_GREEN_scen['value'], NatGas_Price_scenario], axis=1)
+    BO = BO.dropna()
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    # Extracting the data to perform linear regression
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    # Extract the electricity production values for Solar-PV
+    df_ELEC_PRO_PV = df_PRO_scen[
+        (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+        (df_PRO_scen['C'].isin(Countries_from)) & 
+        (df_PRO_scen['Y'] == YEAR) & 
+        (df_PRO_scen['TECH_TYPE'] == 'SOLAR-PV')
+    ]
+    df_ELEC_PRO_PV = df_ELEC_PRO_PV.groupby('scenarios')['value'].sum()
+
+    # Initialize the figure
+    fig = go.Figure()
+
+    # Scatter plot for the data points with colormap
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y, mode='markers',
+        marker=dict(
+            color=df_ELEC_PRO_PV,  # Using electricity production values for coloring
+            colorscale='Portland', 
+            size=8, 
+            showscale=True,  # Display the color scale on the side
+            colorbar=dict(title="Solar PV production [TWh]", len=0.6)  # Title for the color scale
+        ),
+        showlegend=False
+    ))
+
+    # Add the regression trendline
+    fig.add_trace(go.Scatter(
+        x=BO['Capacity [GW]'], y=y_pred, mode='lines', 
+        name='Trendline', line=dict(color='black'), showlegend=True
+    ))
+
+    # New point for the base natural gas price and H2 capacity
+    new_point_x = NatGas_Price_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+    
+    fig.add_trace(go.Scatter(
+        x=[new_point_x], y=[new_point_y], mode='markers',
+        marker=dict(color='black', size=10),
+        name='Baseline', showlegend=True
+    ))
+
+    # Update the layout of the figure
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title="Natural gas price [€/GJ]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500,
+        title_x=0.5,  # Center the title
+        title_y=0.84
+    )
+
+    # Show the plot
+    fig.show()
+
+def Post_analysis_CO2_tax_colormap_PV(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, CO2_tax_base, CO2_Tax_scenario, df_PRO_scen, Countries_from, YEAR, type : str) :
+    
+    BO = pd.concat([df_H2_CAP_GREEN_scen['value'], CO2_Tax_scenario], axis=1)
+    BO = BO.dropna() 
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+     # Extract the electricity production values for Solar-PV
+    df_ELEC_PRO_PV = df_PRO_scen[
+        (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+        (df_PRO_scen['C'].isin(Countries_from)) & 
+        (df_PRO_scen['Y'] == YEAR) & 
+        (df_PRO_scen['TECH_TYPE'] == 'SOLAR-PV')
+    ]
+    df_ELEC_PRO_PV = df_ELEC_PRO_PV.groupby('scenarios')['value'].sum()
+
+    fig = go.Figure()
+
+    # Scatter plot for the data points with colormap
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y, mode='markers',
+        marker=dict(
+            color=df_ELEC_PRO_PV,  # Using electricity production values for coloring
+            colorscale='Portland',  # You can change 'Portland' to another colorscale if desired
+            size=8, 
+            showscale=True,  # Display the color scale on the side
+            colorbar=dict(title="Solar PV production [TWh]", len=0.6)  # Title for the color scale
+        ),
+        showlegend=False
+    ))
+
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=y_pred, mode='lines', name='Trendline', line=dict(color='black'),showlegend=True))
+
+    new_point_x =  CO2_tax_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+    
+    
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='black', size=10),
+        name='Baseline',
+        showlegend=True
+    ))
+
+
+    fig.update_layout(
+        title={
+            'text': f'R² = {r2:.2f}',
+            # 'text': f'Green H2 Capacity vs Offshore Wind Production in DK for 2050 <br>R² = {r2:.2f}',
+            'y': 0.84,  
+            'x': 0.5,  
+            'xanchor': 'center', 
+            'yanchor': 'top' 
+        },
+        xaxis_title= "CO2 tax price [€/ ton CO2]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500
+    )
+
+    fig.show()
+
+def Post_analysis_SMR_CCS_INVC_colormap_PV(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, SMR_CCS_INVC_base, SMR_CCS_INVC_scenario,df_PRO_scen, Countries_from, YEAR, type : str) :
+    
+    BO = pd.concat([df_H2_CAP_GREEN_scen['value'], SMR_CCS_INVC_scenario], axis=1)
+    BO = BO.dropna() 
+    #print(BO)
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+     # Extract the electricity production values for Solar-PV
+    df_ELEC_PRO_PV = df_PRO_scen[
+        (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+        (df_PRO_scen['C'].isin(Countries_from)) & 
+        (df_PRO_scen['Y'] == YEAR) & 
+        (df_PRO_scen['TECH_TYPE'] == 'SOLAR-PV')
+    ]
+    df_ELEC_PRO_PV = df_ELEC_PRO_PV.groupby('scenarios')['value'].sum()
+
+
+    fig = go.Figure()
+
+     # Scatter plot for the data points with colormap
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y, mode='markers',
+        marker=dict(
+            color=df_ELEC_PRO_PV,  # Using electricity production of solar PV for scale
+            colorscale='Portland',  
+            size=8, 
+            showscale=True,  # Display the color scale on the side
+            colorbar=dict(title="Solar PV production [TWh]", len=0.6)  # Title for the color scale
+        ),
+        showlegend=False
+    ))
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=y_pred, mode='lines', name='Trendline', line=dict(color='black'),showlegend=True))
+
+    new_point_x =  SMR_CCS_INVC_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+
+    
+    
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='black', size=10),
+        name='Baseline',
+        showlegend=True
+    ))
+
+
+    fig.update_layout(
+        title={
+            'text': f'R² = {r2:.2f}',
+            # 'text': f'Green H2 Capacity vs Offshore Wind Production in DK for 2050 <br>R² = {r2:.2f}',
+            'y': 0.84,  
+            'x': 0.5,  
+            'xanchor': 'center', 
+            'yanchor': 'top' 
+        },
+        xaxis_title= "SMR CCS Investement Cost [M€/MW]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500
+    )
+
+    fig.show()
+
+#Colormap Wind onshore
+def Post_analysis_colormap_WINDON(
+    df_CAP_scen, 
+    df_H2_CAP_GREEN_scen, 
+    df_H2_CAP_GREEN_tot_BASE, 
+    df_CAP, 
+    df_PRO_scen, 
+    df_H2_PRO_GREEN_scen, 
+    df_H2_PRO_GREEN_tot_BASE, 
+    df_PRO,
+    NatGas_Price_scenario,  
+    scen, 
+    YEAR, 
+    Countries_from, 
+    type: str, 
+    type2: str
+):
+    # Filter and process data based on `type2`
+    if type2 == "Capacity":
+        df_ELEC_CAP = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_CAP_scen['C'].isin(Countries_from)) & 
+            (df_CAP_scen['Y'] == YEAR) & 
+            (df_CAP_scen['TECH_TYPE'] == type)
+        ]
+        df_ELEC_CAP = df_ELEC_CAP.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_CAP = df_ELEC_CAP.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_CAP = df_ELEC_CAP.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_CAP = df_CAP[
+            (df_CAP['COMMODITY'] == 'ELECTRICITY') & 
+            (df_CAP['C'].isin(Countries_from)) & 
+            (df_CAP['Y'] == YEAR) & 
+            (df_CAP['TECH_TYPE'] == type)
+        ]
+        df_BASE_ELEC_CAP_tot = df_BASE_ELEC_CAP['value'].sum()
+
+        BO = pd.concat([df_H2_CAP_GREEN_scen['value'], df_ELEC_CAP['value']], axis=1)
+        BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+        X = BO['Capacity [GW]'].values
+        y = BO['Green H2 Capacity [GW]'].values
+
+    elif type2 == "Production":
+        df_ELEC_PRO = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO_scen['C'].isin(Countries_from)) & 
+            (df_PRO_scen['Y'] == YEAR) & 
+            (df_PRO_scen['TECH_TYPE'] == type)
+        ]
+        df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_PRO = df_PRO[
+            (df_PRO['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO['C'].isin(Countries_from)) & 
+            (df_PRO['Y'] == YEAR) & 
+            (df_PRO['TECH_TYPE'] == type)
+        ]
+        df_BASE_ELEC_PRO_tot = df_BASE_ELEC_PRO['value'].sum()
+        BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
+        BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+        X = BO['Production [TWh]'].values
+        y = BO['Green H2 Production [TWh]'].values
+
+
+
+    # Creating the plot
+    fig = go.Figure()
+
+
+    df_ELEC_PRO_WIND = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO_scen['C'].isin(Countries_from)) & 
+            (df_PRO_scen['Y'] == YEAR) & 
+            (df_PRO_scen['TECH_TYPE'] == 'WIND-ON')]
+    df_ELEC_PRO_WIND = df_ELEC_PRO_WIND.groupby('scenarios')['value'].sum()
+
+    
+    # Assign colors based on price categories
+    fig.add_trace(go.Scatter(
+        x=X, y=y, mode='markers', 
+        marker=dict(color=df_ELEC_PRO_WIND, colorscale='Portland', size=8, showscale=True,
+                    colorbar=dict(title="Onshore wind production [TWh]", len=0.6),
+        ),
+        showlegend=False
+    ))
+    
+
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # Plot the new point
+    new_point_x = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
+    new_point_y = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
+
+    fig.add_trace(go.Scatter(
+        x=[new_point_x], y=[new_point_y],
+        mode='markers', marker=dict(color='black', size=10),
+        name='Baseline'
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"{type} {type2} [TWh]",
+        yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
+        width=800,
+        height=600,
+        coloraxis_colorbar=dict(title="Capacity [GW]" if type2 == "Capacity" else "Production [TWh]")
+    )
+
+    fig.show()
+
+#Colormap Windoffshore
+def Post_analysis_Natgas_colormap_WINDOFF(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, 
+                                      NatGas_Price_base, NatGas_Price_scenario, 
+                                      df_PRO_scen, Countries_from, YEAR, type : str):
+    
+    # Concatenate the two dataframes for Natural Gas Price and Green H2 Capacity
+    BO = pd.concat([df_H2_CAP_GREEN_scen['value'], NatGas_Price_scenario], axis=1)
+    BO = BO.dropna()
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    # Extracting the data to perform linear regression
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    # Extract the electricity production values for Solar-PV
+    df_ELEC_PRO_WINDOFF = df_PRO_scen[
+        (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+        (df_PRO_scen['C'].isin(Countries_from)) & 
+        (df_PRO_scen['Y'] == YEAR) & 
+        (df_PRO_scen['TECH_TYPE'] == 'WIND-OFF')
+    ]
+    df_ELEC_PRO_WINDOFF = df_ELEC_PRO_WINDOFF.groupby('scenarios')['value'].sum()
+
+    # Initialize the figure
+    fig = go.Figure()
+
+    # Scatter plot for the data points with colormap
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y, mode='markers',
+        marker=dict(
+            color=df_ELEC_PRO_WINDOFF,  # Using electricity production values for coloring
+            colorscale='Portland', 
+            size=8, 
+            showscale=True,  # Display the color scale on the side
+            colorbar=dict(title="Wind offshore production [TWh]", len=0.6)  # Title for the color scale
+        ),
+        showlegend=False
+    ))
+
+    # Add the regression trendline
+    fig.add_trace(go.Scatter(
+        x=BO['Capacity [GW]'], y=y_pred, mode='lines', 
+        name='Trendline', line=dict(color='black'), showlegend=True
+    ))
+
+    # New point for the base natural gas price and H2 capacity
+    new_point_x = NatGas_Price_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+    
+    fig.add_trace(go.Scatter(
+        x=[new_point_x], y=[new_point_y], mode='markers',
+        marker=dict(color='black', size=10),
+        name='Baseline', showlegend=True
+    ))
+
+    # Update the layout of the figure
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title="Natural gas price [€/GJ]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500,
+        title_x=0.5,  # Center the title
+        title_y=0.84
+    )
+
+    # Show the plot
+    fig.show()
+
+def Post_analysis_CO2_tax_colormap_WINDOFF(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, CO2_tax_base, CO2_Tax_scenario, df_PRO_scen, Countries_from, YEAR, type : str) :
+    
+    BO = pd.concat([df_H2_CAP_GREEN_scen['value'], CO2_Tax_scenario], axis=1)
+    BO = BO.dropna() 
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+     # Extract the electricity production values for Solar-PV
+    df_ELEC_PRO_WINDOFF = df_PRO_scen[
+        (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+        (df_PRO_scen['C'].isin(Countries_from)) & 
+        (df_PRO_scen['Y'] == YEAR) & 
+        (df_PRO_scen['TECH_TYPE'] == 'WIND-OFF')
+    ]
+    df_ELEC_PRO_WINDOFF = df_ELEC_PRO_WINDOFF.groupby('scenarios')['value'].sum()
+
+    fig = go.Figure()
+
+    # Scatter plot for the data points with colormap
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y, mode='markers',
+        marker=dict(
+            color=df_ELEC_PRO_WINDOFF,  # Using electricity production values for coloring
+            colorscale='Portland',  # You can change 'Portland' to another colorscale if desired
+            size=8, 
+            showscale=True,  # Display the color scale on the side
+            colorbar=dict(title="Offshore wind production [TWh]", len=0.6)  # Title for the color scale
+        ),
+        showlegend=False
+    ))
+
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=y_pred, mode='lines', name='Trendline', line=dict(color='black'),showlegend=True))
+
+    new_point_x =  CO2_tax_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+    
+    
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='black', size=10),
+        name='Baseline',
+        showlegend=True
+    ))
+
+
+    fig.update_layout(
+        title={
+            'text': f'R² = {r2:.2f}',
+            # 'text': f'Green H2 Capacity vs Offshore Wind Production in DK for 2050 <br>R² = {r2:.2f}',
+            'y': 0.84,  
+            'x': 0.5,  
+            'xanchor': 'center', 
+            'yanchor': 'top' 
+        },
+        xaxis_title= "CO2 tax price [€/ ton CO2]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500
+    )
+
+    fig.show()
+
+def Post_analysis_colormap_WINDOFF(
+    df_CAP_scen, 
+    df_H2_CAP_GREEN_scen, 
+    df_H2_CAP_GREEN_tot_BASE, 
+    df_CAP, 
+    df_PRO_scen, 
+    df_H2_PRO_GREEN_scen, 
+    df_H2_PRO_GREEN_tot_BASE, 
+    df_PRO,
+    NatGas_Price_scenario,  
+    scen, 
+    YEAR, 
+    Countries_from, 
+    type: str, 
+    type2: str):
+        
+    # Filter and process data based on `type2`
+    if type2 == "Capacity":
+        df_ELEC_CAP = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_CAP_scen['C'].isin(Countries_from)) & 
+            (df_CAP_scen['Y'] == YEAR) & 
+            (df_CAP_scen['TECH_TYPE'] == type)
+        ]
+        df_ELEC_CAP = df_ELEC_CAP.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_CAP = df_ELEC_CAP.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_CAP = df_ELEC_CAP.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_CAP = df_CAP[
+            (df_CAP['COMMODITY'] == 'ELECTRICITY') & 
+            (df_CAP['C'].isin(Countries_from)) & 
+            (df_CAP['Y'] == YEAR) & 
+            (df_CAP['TECH_TYPE'] == type)
+        ]
+        df_BASE_ELEC_CAP_tot = df_BASE_ELEC_CAP['value'].sum()
+
+        BO = pd.concat([df_H2_CAP_GREEN_scen['value'], df_ELEC_CAP['value']], axis=1)
+        BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+        X = BO['Capacity [GW]'].values
+        y = BO['Green H2 Capacity [GW]'].values
+
+    elif type2 == "Production":
+        df_ELEC_PRO = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO_scen['C'].isin(Countries_from)) & 
+            (df_PRO_scen['Y'] == YEAR) & 
+            (df_PRO_scen['TECH_TYPE'] == type)
+        ]
+        df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_PRO = df_PRO[
+            (df_PRO['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO['C'].isin(Countries_from)) & 
+            (df_PRO['Y'] == YEAR) & 
+            (df_PRO['TECH_TYPE'] == type)
+        ]
+        df_BASE_ELEC_PRO_tot = df_BASE_ELEC_PRO['value'].sum()
+        BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
+        BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+        X = BO['Production [TWh]'].values
+        y = BO['Green H2 Production [TWh]'].values
+
+
+
+    # Creating the plot
+    fig = go.Figure()
+
+
+    df_ELEC_PRO_WIND = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO_scen['C'].isin(Countries_from)) & 
+            (df_PRO_scen['Y'] == YEAR) & 
+            (df_PRO_scen['TECH_TYPE'] == 'WIND-OFF')]
+    df_ELEC_PRO_WIND = df_ELEC_PRO_WIND.groupby('scenarios')['value'].sum()
+
+    
+    # Assign colors based on categories
+    fig.add_trace(go.Scatter(
+        x=X, y=y, mode='markers', 
+        marker=dict(color=df_ELEC_PRO_WIND, colorscale='Portland', size=8, showscale=True,
+                    colorbar=dict(title="Offshore wind production [TWh]", len=0.6),
+        ),
+        showlegend=False
+    ))
+    
+
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # Plot the new point
+    new_point_x = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
+    new_point_y = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
+
+    fig.add_trace(go.Scatter(
+        x=[new_point_x], y=[new_point_y],
+        mode='markers', marker=dict(color='black', size=10),
+        name='Baseline'
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"{type} {type2} [TWh]",
+        yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
+        width=800,
+        height=600,
+        coloraxis_colorbar=dict(title="Capacity [GW]" if type2 == "Capacity" else "Production [TWh]")
+    )
+
+    fig.show()
+
+#Re vs ng colored by green H2
+def Colormap_GreenH2_RE_vs_NG(df_CAP_scen, df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, df_CAP, df_PRO_scen, df_H2_PRO_GREEN_scen, df_H2_PRO_GREEN_tot_BASE, df_PRO, NatGas_Price_scenario,scen, 
+    YEAR, Countries_from, type: str, type2: str
+):
+    # Filter and process data based on `type2`
+    if type2 == "Capacity":
+        df_ELEC_CAP = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_CAP_scen['C'].isin(Countries_from)) &
+            (df_CAP_scen['Y'] == YEAR) &
+            (df_CAP_scen['TECH_TYPE']== type)
+        ]
+        df_ELEC_CAP = df_ELEC_CAP.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_CAP = df_ELEC_CAP.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_CAP = df_ELEC_CAP.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_CAP = df_CAP[
+            (df_CAP['COMMODITY'] == 'ELECTRICITY') &
+            (df_CAP['C'].isin(Countries_from)) &
+            (df_CAP['Y'] == YEAR) &
+            (df_CAP['TECH_TYPE'] ==type)
+        ]
+        df_BASE_ELEC_CAP_tot = df_BASE_ELEC_CAP['value'].sum()
+
+        BO = pd.concat([NatGas_Price_scenario, df_ELEC_CAP['value']], axis=1)
+        BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+        y = BO['Capacity [GW]'].values
+        X = BO['Green H2 Capacity [GW]'].values
+
+    elif type2 == "Production":
+        df_ELEC_PRO = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_PRO_scen['C'].isin(Countries_from)) &
+            (df_PRO_scen['Y'] == YEAR) &
+            (df_PRO_scen['TECH_TYPE']==type)
+        ]
+        df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_PRO = df_PRO[
+            (df_PRO['COMMODITY'] == 'ELECTRICITY') &
+            (df_PRO['C'].isin(Countries_from)) &
+            (df_PRO['Y'] == YEAR) &
+            (df_PRO['TECH_TYPE']==type)
+        ]
+        df_BASE_ELEC_PRO_tot = df_BASE_ELEC_PRO['value'].sum()
+        BO = pd.concat([NatGas_Price_scenario, df_ELEC_PRO['value']], axis=1)
+        BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+        y = BO['Production [TWh]'].values
+        X = BO['Green H2 Production [TWh]'].values
+
+    # Creating the plot
+    fig = go.Figure()
+
+   
+    # Assign colors based on price categories
+    fig.add_trace(go.Scatter(
+        x=X, y=y, mode='markers', 
+        marker=dict(color=df_H2_PRO_GREEN_scen['value'], colorscale='Portland', size=8, showscale=True,
+                    colorbar=dict(title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]", len=0.6)),
+                    showlegend=False
+    )), 
+
+
+
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # Plot the new point
+    #new_point_y = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
+    #new_point_x = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
+
+    #fig.add_trace(go.Scatter(
+        #x=[new_point_x], y=[new_point_y],
+        #mode='markers', marker=dict(color='black', size=10),
+        #name='Baseline'
+    #))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        yaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"{type} {type2} [TWh]",
+        xaxis_title="Natural gas price [€/GJ]",
+        width=800,
+        height=600,
+    )
+    fig.show()
+
+#Re vs CO2 colored by green H2
+def Colormap_GreenH2_RE_vs_CO2(df_CAP_scen, df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, df_CAP, df_PRO_scen, df_H2_PRO_GREEN_scen, df_H2_PRO_GREEN_tot_BASE, df_PRO, CO2_Tax_scenario,scen, 
+    YEAR, Countries_from, type: str, type2: str
+):
+    # Filter and process data based on `type2`
+    if type2 == "Capacity":
+        df_ELEC_CAP = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_CAP_scen['C'].isin(Countries_from)) &
+            (df_CAP_scen['Y'] == YEAR) &
+            (df_CAP_scen['TECH_TYPE']== type)
+        ]
+        df_ELEC_CAP = df_ELEC_CAP.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_CAP = df_ELEC_CAP.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_CAP = df_ELEC_CAP.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_CAP = df_CAP[
+            (df_CAP['COMMODITY'] == 'ELECTRICITY') &
+            (df_CAP['C'].isin(Countries_from)) &
+            (df_CAP['Y'] == YEAR) &
+            (df_CAP['TECH_TYPE'] ==type)
+        ]
+        df_BASE_ELEC_CAP_tot = df_BASE_ELEC_CAP['value'].sum()
+
+        BO = pd.concat([CO2_Tax_scenario, df_ELEC_CAP['value']], axis=1)
+        BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+        y = BO['Capacity [GW]'].values
+        X = BO['Green H2 Capacity [GW]'].values
+
+    elif type2 == "Production":
+        df_ELEC_PRO = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_PRO_scen['C'].isin(Countries_from)) &
+            (df_PRO_scen['Y'] == YEAR) &
+            (df_PRO_scen['TECH_TYPE']==type)
+        ]
+        df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_PRO = df_PRO[
+            (df_PRO['COMMODITY'] == 'ELECTRICITY') &
+            (df_PRO['C'].isin(Countries_from)) &
+            (df_PRO['Y'] == YEAR) &
+            (df_PRO['TECH_TYPE']==type)
+        ]
+        df_BASE_ELEC_PRO_tot = df_BASE_ELEC_PRO['value'].sum()
+        BO = pd.concat([CO2_Tax_scenario, df_ELEC_PRO['value']], axis=1)
+        BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+        y = BO['Production [TWh]'].values
+        X = BO['Green H2 Production [TWh]'].values
+
+    # Creating the plot
+    fig = go.Figure()
+
+   
+    # Assign colors based on price categories
+    fig.add_trace(go.Scatter(
+        x=X, y=y, mode='markers', 
+        marker=dict(color=df_H2_PRO_GREEN_scen['value'], colorscale='Portland', size=8, showscale=True,
+                    colorbar=dict(title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]", len=0.6)),
+                    showlegend=False
+    )), 
+
+
+
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # Plot the new point
+    #new_point_y = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
+    #new_point_x = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
+
+    #fig.add_trace(go.Scatter(
+        #x=[new_point_x], y=[new_point_y],
+        #mode='markers', marker=dict(color='black', size=10),
+        #name='Baseline'
+    #))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        yaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"{type} {type2} [TWh]",
+        xaxis_title="CO2 tax price [€/ton of CO2]",
+        width=800,
+        height=600,
+    )
+    fig.show()
+
+#One RE vs another RE
+def Post_analysis_Test(df_CAP_scen, df_PRO_scen, scen, Countries_from, YEAR, type: str,type2 : str):
+    
+    df_ELEC_PRO = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO_scen['C'].isin(Countries_from)) & 
+            (df_PRO_scen['Y'] == YEAR) & 
+            (df_PRO_scen['TECH_TYPE'] == type)]
+        
+    df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+    df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+    df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    
+    df_ELEC_PRO_2 = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_CAP_scen['C'].isin(Countries_from)) & 
+            (df_CAP_scen['Y'] == YEAR) & 
+            (df_CAP_scen['TECH_TYPE'] == type2)]
+        
+    df_ELEC_PRO_2 = df_ELEC_PRO_2.groupby('scenarios')['value'].sum().reset_index()
+    df_ELEC_PRO_2 = df_ELEC_PRO_2.sort_values(by=['scenarios'], ascending=True)
+    df_ELEC_PRO_2 = df_ELEC_PRO_2.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    
+    
+    BO = pd.concat([df_ELEC_PRO['value'], df_ELEC_PRO_2['value']], axis=1)
+    BO = BO.dropna() 
+    #print(BO)
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=BO['Green H2 Capacity [GW]'], mode='markers',showlegend=False))
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=y_pred, mode='lines', name='Trendline', line=dict(color='red'),showlegend=False))
+
+
+    
+    
+
+    fig.update_layout(
+        title={
+            'text': f'R² = {r2:.2f}',
+            # 'text': f'Green H2 Capacity vs Offshore Wind Production in DK for 2050 <br>R² = {r2:.2f}',
+            'y': 0.84,  
+            'x': 0.5,  
+            'xanchor': 'center', 
+            'yanchor': 'top' 
+        },
+        xaxis_title= f"{type2} Production [TWh]",
+        yaxis_title=f"{type} Production [TWh]",
+        width=600,
+        height=500
+    )
+
+    fig.show()          
+    
+#One RE vs another RE colored by H2 production
+def Colormap_GreenH2_RE_vs_RE(df_PRO_scen, df_H2_PRO_GREEN_scen, df_H2_PRO_GREEN_tot_BASE, df_PRO,scen, 
+    YEAR, Countries_from, type: str, type2 : str):
+    
+    
+    df_ELEC_PRO = df_PRO_scen[
+        (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') &
+        (df_PRO_scen['C'].isin(Countries_from)) &
+        (df_PRO_scen['Y'] == YEAR) &
+        (df_PRO_scen['TECH_TYPE']==type)
+    ]
+    df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+    df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+    df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    df_BASE_ELEC_PRO = df_PRO[
+        (df_PRO['COMMODITY'] == 'ELECTRICITY') &
+        (df_PRO['C'].isin(Countries_from)) &
+        (df_PRO['Y'] == YEAR) &
+        (df_PRO['TECH_TYPE']==type)
+    ]
+    df_BASE_ELEC_PRO_tot = df_BASE_ELEC_PRO['value'].sum()
+
+    df_ELEC_PRO2 = df_PRO_scen[
+        (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') &
+        (df_PRO_scen['C'].isin(Countries_from)) &
+        (df_PRO_scen['Y'] == YEAR) &
+        (df_PRO_scen['TECH_TYPE']==type2)
+    ]
+    df_ELEC_PRO2 = df_ELEC_PRO2.groupby('scenarios')['value'].sum().reset_index()
+    df_ELEC_PRO2 = df_ELEC_PRO2.sort_values(by=['scenarios'], ascending=True)
+    df_ELEC_PRO2 = df_ELEC_PRO2.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    df_BASE_ELEC_PRO2 = df_PRO[
+        (df_PRO['COMMODITY'] == 'ELECTRICITY') &
+        (df_PRO['C'].isin(Countries_from)) &
+        (df_PRO['Y'] == YEAR) &
+        (df_PRO['TECH_TYPE']==type2)
+    ]
+    df_BASE_ELEC_PRO2_tot = df_BASE_ELEC_PRO2['value'].sum()
+
+    BO = pd.concat([df_ELEC_PRO2['value'], df_ELEC_PRO['value']], axis=1)
+    BO.columns = ['Production2 [TWh]', 'Production [TWh]']
+
+    y = BO['Production [TWh]'].values
+    X = BO['Production2 [TWh]'].values
+
+    # Creating the plot
+    fig = go.Figure()
+
+   
+    # Assign colors based on price categories
+    fig.add_trace(go.Scatter(
+        x=X, y=y, mode='markers', 
+        marker=dict(color=df_H2_PRO_GREEN_scen['value'], colorscale='Portland', size=8, showscale=True,
+                    colorbar=dict(title=f"Green H2 Production [TWh]", len=0.6)),
+                    showlegend=False
+    )), 
+
+
+
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # Plot the new point
+    #new_point_y = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
+    #new_point_x = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
+
+    #fig.add_trace(go.Scatter(
+        #x=[new_point_x], y=[new_point_y],
+        #mode='markers', marker=dict(color='black', size=10),
+        #name='Baseline'
+    #))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        yaxis_title=f"{type} production [TWh]",
+        xaxis_title=f"{type2} production [TWh]",
+        width=800,
+        height=600,
+    )
+    fig.show()
+
+
+#########Ongoing work#########
+#KPOT (ongoing)
+def Post_analysis_KPOT(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, KPOT_SolarPV_North_base, KPOT_SolarPV_North_scenario, type : str):
+    BO = pd.concat([df_H2_CAP_GREEN_scen['value'], KPOT_SolarPV_North_scenario], axis=1)
+    BO = BO.dropna() 
+    #print(BO)
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=BO['Green H2 Capacity [GW]'], mode='markers',showlegend=False))
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=y_pred, mode='lines', name='Trendline', line=dict(color='red'),showlegend=False))
+
+    new_point_x =  KPOT_SolarPV_North_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+    #print(new_point_x)
+    
+    
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='yellow', size=10),
+        name='New Point',
+        showlegend=False
+    ))
+
+
+    fig.update_layout(
+        title={
+            'text': f'R² = {r2:.2f}',
+            # 'text': f'Green H2 Capacity vs Offshore Wind Production in DK for 2050 <br>R² = {r2:.2f}',
+            'y': 0.84,  
+            'x': 0.5,  
+            'xanchor': 'center', 
+            'yanchor': 'top' 
+        },
+        xaxis_title= "Solar PV EU North potential (MW)",
+        yaxis_title=f"Green H2{type}",
+        width=600,
+        height=500
+    )
+
+    fig.show()          
+#Kpot2 (Ongoing)
+def Post_analysis_KPOT2(df_CAP_scen, df_PRO_scen, scen, KPOT_SolarPV_North_base, KPOT_SolarPV_North_scenario, KPOT_WINDONS_South_scenario, KPOT_WINDONS_South_base, Countries_from, YEAR, type: str,type2 : str):
+    
+    df_ELEC_CAP = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_PRO_scen['C'].isin(Countries_from)) & 
+            (df_PRO_scen['Y'] == YEAR) & 
+            (df_PRO_scen['TECH_TYPE'] == type)]
+        
+    df_ELEC_CAP = df_ELEC_CAP.groupby('scenarios')['value'].sum().reset_index()
+    #df_ELEC_CAP = df_ELEC_CAP.sort_values(by=['scenarios'], ascending=True)
+    #df_ELEC_CAP = df_ELEC_CAP.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        
+    df_ELEC_CAP_ratio = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') & 
+            (df_CAP_scen['C'].isin(Countries_from)) & 
+            (df_CAP_scen['Y'] == YEAR) & 
+            (df_CAP_scen['TECH_TYPE'] == type2)]
+        
+    df_ELEC_CAP_ratio = df_ELEC_CAP_ratio.groupby('scenarios')['value'].sum().reset_index()
+    #df_ELEC_CAP_ratio = df_ELEC_CAP_ratio.sort_values(by=['scenarios'], ascending=True)
+    #df_ELEC_CAP_ratio = df_ELEC_CAP_ratio.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    
+    if type2 == 'SOLAR-PV' : 
+        Ratio = df_ELEC_CAP_ratio.iloc[:, 0]/(KPOT_SolarPV_North_scenario/1000)
+    elif type2 =='WIND-ON' :
+        Ratio = df_ELEC_CAP_ratio.iloc[:, 0]/(KPOT_WINDONS_South_scenario/1000)
+    
+    print(Ratio)
+    print(df_ELEC_CAP_ratio)
+    print(KPOT_SolarPV_North_scenario)
+    BO = pd.concat([df_ELEC_CAP['value'], Ratio], axis=1)
+    BO = BO.dropna() 
+    #print(BO)
+    BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+    X = BO['Capacity [GW]'].values.reshape(-1, 1)
+    y = BO['Green H2 Capacity [GW]'].values
+
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=BO['Green H2 Capacity [GW]'], mode='markers',showlegend=False))
+    fig.add_trace(go.Scatter(x=BO['Capacity [GW]'], y=y_pred, mode='lines', name='Trendline', line=dict(color='red'),showlegend=False))
+
+    #new_point_x =  KPOT_SolarPV_North_base
+    #new_point_y = df_H2_CAP_GREEN_tot_BASE
+    #print(new_point_x)
+    
+    
+
+    fig.update_layout(
+        title={
+            'text': f'R² = {r2:.2f}',
+            # 'text': f'Green H2 Capacity vs Offshore Wind Production in DK for 2050 <br>R² = {r2:.2f}',
+            'y': 0.84,  
+            'x': 0.5,  
+            'xanchor': 'center', 
+            'yanchor': 'top' 
+        },
+        xaxis_title= "Ratio Solar PV capacity and PV Kpot",
+        yaxis_title=f"{type} Capacity [GW]",
+        width=600,
+        height=500
+    )
+
+    fig.show()    
+
+#GREAT plot KPOT (ongoing)
+def GREAT_KPOT(df_CAP_scen, df_RE_CAP, YEAR, scenario, Countries_from) :
+    df_SolarPV_DK  = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_CAP_scen['C'].isin(Countries_from)) &
+            (df_CAP_scen['Y'] == YEAR) &
+            (df_CAP_scen['TECH_TYPE'] == 'SOLAR-PV') &
+            (df_CAP_scen['scenarios'] == scenario)
+        ]
+    df_SolarPV_DK_KPOT = df_RE_CAP[
+            (df_RE_CAP['scenarios'] == scenario) &
+            (df_RE_CAP['C'] == 'DENMARK') &
+            (df_RE_CAP['TECH_GROUP']== 'SOLAR-PV')]
+    
+    
+    print(df_SolarPV_DK_KPOT)
+    print(df_SolarPV_DK)
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(['DENMARK'], df_SolarPV_DK, color='skyblue')
+
+    # Add labels and title
+    plt.xlabel('Countries', fontsize=12)
+    plt.ylabel('GW Installed', fontsize=12)
+    plt.title('Installed Capacity by Country (GW)', fontsize=14)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+    # Plot the new point
+    new_point_y = df_SolarPV_DK_KPOT['value']
+    new_point_x = ['DENMARK']
+    # Show plot
+    plt.tight_layout()
+    plt.show()
+
+
+#####Not used######
+#Correlation with colors categorisation (Not used)
+#Color categories Wind and PV 
+def Post_analysis_color(
+    df_CAP_scen, 
+    df_H2_CAP_GREEN_scen, 
+    df_H2_CAP_GREEN_tot_BASE, 
+    df_CAP, 
+    df_PRO_scen, 
+    df_H2_PRO_GREEN_scen, 
+    df_H2_PRO_GREEN_tot_BASE, 
+    df_PRO, 
+    scen, 
+    YEAR, 
+    Countries_from, 
+    type: str, 
+    type2: str
+):
+    # Filter and process data based on `type2`
+    if type2 == "Capacity":
+        df_ELEC_CAP = df_CAP_scen[
+            (df_CAP_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_CAP_scen['C'].isin(Countries_from)) &
+            (df_CAP_scen['Y'] == YEAR) &
+            (df_CAP_scen['TECH_TYPE'] == type)
+        ]
+        df_ELEC_CAP = df_ELEC_CAP.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_CAP = df_ELEC_CAP.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_CAP = df_ELEC_CAP.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_CAP = df_CAP[
+            (df_CAP['COMMODITY'] == 'ELECTRICITY') &
+            (df_CAP['C'].isin(Countries_from)) &
+            (df_CAP['Y'] == YEAR) &
+            (df_CAP['TECH_TYPE'] == type)
+        ]
+        df_BASE_ELEC_CAP_tot = df_BASE_ELEC_CAP['value'].sum()
+
+        BO = pd.concat([df_H2_CAP_GREEN_scen['value'], df_ELEC_CAP['value']], axis=1)
+        BO.columns = ['Green H2 Capacity [GW]', 'Capacity [GW]']
+
+        X = BO['Capacity [GW]'].values
+        y = BO['Green H2 Capacity [GW]'].values
+
+    elif type2 == "Production":
+        df_ELEC_PRO = df_PRO_scen[
+            (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') &
+            (df_PRO_scen['C'].isin(Countries_from)) &
+            (df_PRO_scen['Y'] == YEAR) &
+            (df_PRO_scen['TECH_TYPE'] == type)
+        ]
+        df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+        df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+        df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+        df_BASE_ELEC_PRO = df_PRO[
+            (df_PRO['COMMODITY'] == 'ELECTRICITY') &
+            (df_PRO['C'].isin(Countries_from)) &
+            (df_PRO['Y'] == YEAR) &
+            (df_PRO['TECH_TYPE'] == type)
+        ]
+        df_BASE_ELEC_PRO_tot = df_BASE_ELEC_PRO['value'].sum()
+        BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
+        BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+        X = BO['Production [TWh]'].values
+        y = BO['Green H2 Production [TWh]'].values
+
+    a = df_PRO_scen[(df_PRO_scen['TECH_TYPE']=='SOLAR-PV')].groupby('scenarios')['value'].sum()
+    b = df_PRO_scen[(df_PRO_scen['TECH_TYPE']=='WIND-OFF')].groupby('scenarios')['value'].sum()
+    # Moyennes
+    mean_a = np.mean(a)
+    mean_b = np.mean(b)
+
+
+    # Identifying the points that fit the conditions using np.argwhere
+    Index_high_high = np.argwhere((a > mean_a) & (b > mean_b)).flatten()  # High PV, high wind
+    Index_low_low = np.argwhere((a < mean_a)  & (b < mean_b)).flatten()  # Low PV, low wind
+    Index_high_low = np.argwhere((a > mean_a)  & (b < mean_b)).flatten()  # high PV, low wind
+    Index_low_high = np.argwhere((a < mean_a)  & (b > mean_b)).flatten()  # Low PV, high wind
+   
+
+    # Extracting the values for each category
+    sx_high_high = X[Index_high_high]
+    sy_high_high = y[Index_high_high]
+    sx_low_low = X[Index_low_low]
+    sy_low_low = y[Index_low_low]
+    sx_high_low = X[Index_high_low]
+    sy_high_low = y[Index_high_low]
+    sx_low_high = X[Index_low_high]
+    sy_low_high = y[Index_low_high]
+
+
+    # Creating the plot
+    fig = go.Figure()
+
+    # Adding traces for High PV and Low PV
+    fig.add_trace(go.Scatter(
+        x=sx_high_high, y=sy_high_high, mode='markers', marker=dict(color='blue', size=8),
+        name='High PV, High offshore wind'
+    ))
+    fig.add_trace(go.Scatter(
+        x=sx_low_low, y=sy_low_low, mode='markers', marker=dict(color='orange', size=8),
+        name='Low PV, Low offshore wind'
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=sx_high_low, y=sy_high_low, mode='markers', marker=dict(color='green', size=8),
+        name='High PV, Low offshore wind'
+    ))
+    fig.add_trace(go.Scatter(
+        x=sx_low_high, y=sy_low_high, mode='markers', marker=dict(color='red', size=8),
+        name='Low PV, High offsore wind'
+    ))
+
+
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # Plot the new point
+    new_point_x = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
+    new_point_y = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
+
+    fig.add_trace(go.Scatter(
+        x=[new_point_x], y=[new_point_y],
+        mode='markers', marker=dict(color='black', size=10),
+        name='Baseline'
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"{type} {type2} [TWh]",
+        yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
+        width=800,
+        height=600,
+        legend_title="PV Categories"
+    )
+
+    fig.show()
+
+def Post_analysis_Natgas_color(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, NatGas_Price_base, NatGas_Price_scenario, df_PRO_scen, type: str):
+    # Create the DataFrame for analysis based on Solar PV and Wind production
+    a = df_PRO_scen[(df_PRO_scen['TECH_TYPE']=='SOLAR-PV')].groupby('scenarios')['value'].sum()
+    b = df_PRO_scen[(df_PRO_scen['TECH_TYPE']=='WIND-OFF')].groupby('scenarios')['value'].sum()
+
+    # Calculate the means for classification
+    mean_a = np.mean(a)  # Mean of Solar PV production
+    mean_b = np.mean(b)  # Mean of Wind production
+
+    # Categorization based on PV and Wind capacity
+    Index_high_high = np.argwhere((a > mean_a) & (b > mean_b)).flatten()  # High PV, High Wind
+    Index_low_low = np.argwhere((a <= mean_a) & (b <= mean_b)).flatten()  # Low PV, Low Wind
+    Index_high_low = np.argwhere((a > mean_a) & (b <= mean_b)).flatten()  # High PV, Low Wind
+    Index_low_high = np.argwhere((a <= mean_a) & (b > mean_b)).flatten()  # Low PV, High Wind
+
+    # Extracting the values for each category
+    sx_high_high = NatGas_Price_scenario[Index_high_high]
+    sy_high_high = df_H2_CAP_GREEN_scen['value'].values[Index_high_high]
+    sx_low_low = NatGas_Price_scenario[Index_low_low]
+    sy_low_low = df_H2_CAP_GREEN_scen['value'].values[Index_low_low]
+    sx_high_low = NatGas_Price_scenario[Index_high_low]
+    sy_high_low = df_H2_CAP_GREEN_scen['value'].values[Index_high_low]
+    sx_low_high = NatGas_Price_scenario[Index_low_high]
+    sy_low_high = df_H2_CAP_GREEN_scen['value'].values[Index_low_high]
+
+    # Creating the plot
+    fig = go.Figure()
+
+    # Add traces for each category with different colors
+    fig.add_trace(go.Scatter(
+        x=sx_high_high, y=sy_high_high, mode='markers', marker=dict(color='blue', size=8),
+        name='High PV, High offshore wind'
+    ))
+    fig.add_trace(go.Scatter(
+        x=sx_low_low, y=sy_low_low, mode='markers', marker=dict(color='orange', size=8),
+        name='Low PV, Low offshore wind'
+    ))
+    fig.add_trace(go.Scatter(
+        x=sx_high_low, y=sy_high_low, mode='markers', marker=dict(color='green', size=8),
+        name='High PV, Low offshore wind'
+    ))
+    fig.add_trace(go.Scatter(
+        x=sx_low_high, y=sy_low_high, mode='markers', marker=dict(color='red', size=8),
+        name='Low PV, High offshore wind'
+    ))
+
+    # Linear regression
+    X = NatGas_Price_scenario.values.reshape(-1, 1)
+    y = df_H2_CAP_GREEN_scen['value'].values
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # New point
+    new_point_x = NatGas_Price_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+
+    # Add the new point
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='black', size=10),
+        name='Baseline',
+        showlegend=False
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title="Natural gas price [€/GJ]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500
+    )
+
+    # Show the plot
+    fig.show()
+
+def Post_analysis_CO2_tax_color(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE, CO2_tax_base, CO2_Tax_scenario, df_PRO_scen, type: str):
+    # Create the DataFrame for analysis based on Solar PV and Wind production
+    a = df_PRO_scen[(df_PRO_scen['TECH_TYPE']=='SOLAR-PV')].groupby('scenarios')['value'].sum()
+    b = df_PRO_scen[(df_PRO_scen['TECH_TYPE']=='WIND-OFF')].groupby('scenarios')['value'].sum()
+
+    # Calculate the means for classification
+    mean_a = np.mean(a)  # Mean of Solar PV production
+    mean_b = np.mean(b)  # Mean of Wind production
+
+    # Categorization based on PV and Wind capacity
+    Index_high_high = np.argwhere((a > mean_a) & (b > mean_b)).flatten()  # High PV, High Wind
+    Index_low_low = np.argwhere((a <= mean_a) & (b <= mean_b)).flatten()  # Low PV, Low Wind
+    Index_high_low = np.argwhere((a > mean_a) & (b <= mean_b)).flatten()  # High PV, Low Wind
+    Index_low_high = np.argwhere((a <= mean_a) & (b > mean_b)).flatten()  # Low PV, High Wind
+
+    # Extracting the values for each category
+    sx_high_high = CO2_Tax_scenario[Index_high_high]
+    sy_high_high = df_H2_CAP_GREEN_scen['value'].values[Index_high_high]
+    sx_low_low = CO2_Tax_scenario[Index_low_low]
+    sy_low_low = df_H2_CAP_GREEN_scen['value'].values[Index_low_low]
+    sx_high_low = CO2_Tax_scenario[Index_high_low]
+    sy_high_low = df_H2_CAP_GREEN_scen['value'].values[Index_high_low]
+    sx_low_high = CO2_Tax_scenario[Index_low_high]
+    sy_low_high = df_H2_CAP_GREEN_scen['value'].values[Index_low_high]
+
+    # Creating the plot
+    fig = go.Figure()
+
+    # Add traces for each category with different colors
+    fig.add_trace(go.Scatter(
+        x=sx_high_high, y=sy_high_high, mode='markers', marker=dict(color='blue', size=8),
+        name='High PV, High offshore wind'
+    ))
+    fig.add_trace(go.Scatter(
+        x=sx_low_low, y=sy_low_low, mode='markers', marker=dict(color='orange', size=8),
+        name='Low PV, Low offshore wind'
+    ))
+    fig.add_trace(go.Scatter(
+        x=sx_high_low, y=sy_high_low, mode='markers', marker=dict(color='green', size=8),
+        name='High PV, Low offshore wind'
+    ))
+    fig.add_trace(go.Scatter(
+        x=sx_low_high, y=sy_low_high, mode='markers', marker=dict(color='red', size=8),
+        name='Low PV, High offshore wind'
+    ))
+
+    # Linear regression
+    X = CO2_Tax_scenario.values.reshape(-1, 1)
+    y = df_H2_CAP_GREEN_scen['value'].values
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # New point
+    new_point_x = CO2_tax_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+
+    # Add the new point
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='black', size=10),
+        name='Baseline',
+        showlegend=False
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title="CO2 tax price [€/ton CO2]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500
+    )
+
+    # Show the plot
+    fig.show()
+
+def Post_analysis_SMR_CCS_INVC_color(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_BASE,  SMR_CCS_INVC_base, SMR_CCS_INVC_scenario, df_PRO_scen, type: str):
+    # Create the DataFrame for analysis based on Solar PV and Wind production
+    a = df_PRO_scen[(df_PRO_scen['TECH_TYPE']=='SOLAR-PV')].groupby('scenarios')['value'].sum()
+    b = df_PRO_scen[(df_PRO_scen['TECH_TYPE']=='WIND-OFF')].groupby('scenarios')['value'].sum()
+
+    # Calculate the means for classification
+    mean_a = np.mean(a)  # Mean of Solar PV production
+    mean_b = np.mean(b)  # Mean of Wind production
+
+    # Categorization based on PV and Wind capacity
+    Index_high_high = np.argwhere((a > mean_a) & (b > mean_b)).flatten()  # High PV, High Wind
+    Index_low_low = np.argwhere((a <= mean_a) & (b <= mean_b)).flatten()  # Low PV, Low Wind
+    Index_high_low = np.argwhere((a > mean_a) & (b <= mean_b)).flatten()  # High PV, Low Wind
+    Index_low_high = np.argwhere((a <= mean_a) & (b > mean_b)).flatten()  # Low PV, High Wind
+
+    # Extracting the values for each category
+    sx_high_high = SMR_CCS_INVC_scenario[Index_high_high]
+    sy_high_high = df_H2_CAP_GREEN_scen['value'].values[Index_high_high]
+    sx_low_low = SMR_CCS_INVC_scenario[Index_low_low]
+    sy_low_low = df_H2_CAP_GREEN_scen['value'].values[Index_low_low]
+    sx_high_low = SMR_CCS_INVC_scenario[Index_high_low]
+    sy_high_low = df_H2_CAP_GREEN_scen['value'].values[Index_high_low]
+    sx_low_high = SMR_CCS_INVC_scenario[Index_low_high]
+    sy_low_high = df_H2_CAP_GREEN_scen['value'].values[Index_low_high]
+
+    # Creating the plot
+    fig = go.Figure()
+
+    # Add traces for each category with different colors
+    fig.add_trace(go.Scatter(
+        x=sx_high_high, y=sy_high_high, mode='markers', marker=dict(color='blue', size=8),
+        name='High PV, High offshore wind'
+    ))
+    fig.add_trace(go.Scatter(
+        x=sx_low_low, y=sy_low_low, mode='markers', marker=dict(color='orange', size=8),
+        name='Low PV, Low offshore wind'
+    ))
+    fig.add_trace(go.Scatter(
+        x=sx_high_low, y=sy_high_low, mode='markers', marker=dict(color='green', size=8),
+        name='High PV, Low offshore wind'
+    ))
+    fig.add_trace(go.Scatter(
+        x=sx_low_high, y=sy_low_high, mode='markers', marker=dict(color='red', size=8),
+        name='Low PV, High offshore wind'
+    ))
+
+    # Linear regression
+    X = SMR_CCS_INVC_scenario.values.reshape(-1, 1)
+    y = df_H2_CAP_GREEN_scen['value'].values
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X.flatten(), y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # New point
+    new_point_x = SMR_CCS_INVC_base
+    new_point_y = df_H2_CAP_GREEN_tot_BASE
+
+    # Add the new point
+    fig.add_trace(go.Scatter(
+        x=[new_point_x],
+        y=[new_point_y],
+        mode='markers',
+        marker=dict(color='black', size=10),
+        name='Baseline',
+        showlegend=False
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title="SMR CCS Investment Cost [M€/MW]",
+        yaxis_title=f"Green H2 {type}",
+        width=600,
+        height=500
+    )
+
+    # Show the plot
+    fig.show()
 
