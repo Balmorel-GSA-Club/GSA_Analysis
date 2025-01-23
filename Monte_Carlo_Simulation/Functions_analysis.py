@@ -954,6 +954,123 @@ def Violin_Setups_Europe(
     return(fig)
 
 
+# Function to violin plot the distribution of different hydrogen information for one region
+
+def Violin_Setups_OneRegion(
+    df_H2_1_BASE_scen_EU, df_H2_1_NoH2_scen_EU, df_H2_1_tot_BASE_EU, df_H2_1_tot_NoH2_EU,
+    df_H2_2_BASE_scen_EU, df_H2_2_NoH2_scen_EU, df_H2_2_tot_BASE_EU, df_H2_2_tot_NoH2_EU,
+    YEAR, type1: str, type2: str
+):
+    if type1 not in ["Green Capacity", "Blue Capacity", "Green Production", "Blue Production", "Storage", "Transmission Capacity", "Transmission Flow"] : 
+        raise ValueError(f"Invalid type: {type1}")
+    if type2 not in ["Green Capacity", "Blue Capacity", "Green Production", "Blue Production", "Storage", "Transmission Capacity", "Transmission Flow"]: 
+        raise ValueError(f"Invalid type: {type2}")
+    print(df_H2_GREEN_BASE_scen_EU)
+    # Baseline values
+    baseline_y = np.array([
+        df_H2_GREEN_tot_BASE_EU, df_H2_GREEN_tot_NoH2_EU,
+        df_H2_BLUE_tot_BASE_EU, df_H2_BLUE_tot_NoH2_EU,
+    ])
+
+    # Assign categories
+    df_H2_1_BASE_scen_EU['category'] = type1 + ' Base'
+    df_H2_1_NoH2_scen_EU['category'] = type1 + ' No H2 Target'
+    df_H2_2_BASE_scen_EU['category'] = type2 + ' Base'
+    df_H2_2_NoH2_scen_EU['category'] = type2 + ' No H2 Target'
+
+    # Combine all dataframes
+    combined_df = pd.concat([
+        df_H2_1_BASE_scen_EU, df_H2_1_NoH2_scen_EU,
+        df_H2_2_BASE_scen_EU, df_H2_2_NoH2_scen_EU
+    ])
+
+    # Determine color and unit
+    color_dict = {
+        "Green Capacity": 'green',
+        "Green Production": 'green',
+        "Blue Capacity": 'blue',
+        "Blue Production": 'blue',
+        "Storage": 'orange',
+        "Transmission Capacity": 'red',
+        "Transmission Flow": 'red'
+    }
+
+    unit_dict = {
+        "Green Capacity": 'GW',
+        "Green Production": 'TWh',
+        "Blue Capacity": 'GW',
+        "Blue Production": 'TWh',
+        "Storage": 'TWh',
+        "Transmission Capacity": 'GW',
+        "Transmission Flow": 'TWh'
+    }
+
+    color1 = color_dict.get(type1, 'black')
+    color2 = color_dict.get(type2, 'black')
+    unit1 = unit_dict.get(type1, 'units')
+    unit2 = unit_dict.get(type2, 'units')
+
+
+    # Create plot
+    if unit1 != unit2:
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        second_axis = False
+    else : 
+        fig = go.Figure()
+        second_axis = True
+
+    # Plot Base 1
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == type1 + ' Base']['value'], name=type1 + ' Base',
+                            box_visible=True, line_color=color1), secondary_y=False)
+    fig.add_trace(go.Scatter(x=[type1 + ' Base'], y=[baseline_y[0]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline ' + type1 + ' Base'), secondary_y=False)
+
+    # Plot NoH2 1
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == type1 + ' No H2 Target']['value'], name=type1 + ' No H2 Target',
+                            box_visible=True, line_color=color1), secondary_y=False)
+    fig.add_trace(go.Scatter(x=[type1 + ' No H2 Target'], y=[baseline_y[1]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline ' + type1 + ' No H2 Target'), secondary_y=False)
+    
+    # Plot Base 2
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == type2 + ' Base']['value'], name=type2 + ' Base',
+                            box_visible=True, line_color=color2), secondary_y=second_axis)
+    fig.add_trace(go.Scatter(x=[type2 + ' Base'], y=[baseline_y[2]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline ' + type2 + ' Base'), secondary_y=second_axis)
+
+    # Plot NoH2 2
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == type2 + ' No H2 Target']['value'], name=type2 + ' No H2 Target',
+                            box_visible=True, line_color=color2), secondary_y=second_axis)
+    fig.add_trace(go.Scatter(x=[type2 + ' No H2 Target'], y=[baseline_y[3]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline ' + type2 + ' No H2 Target'), secondary_y=second_axis)
+    
+     
+    fig.update_layout(
+        title={
+            'text': f'Violin Plot: Value Distribution of H2 {type1} and {type2} in ({YEAR})',
+            'font': {'size': 16}, 
+            
+        },
+
+        yaxis_title=f"H2 {type1} [{unit1}]",
+        yaxis_range=[0, None],
+        height=600,
+        width=1200,
+        legend=dict(orientation='h', x=0.5, y=1, xanchor='center', yanchor='bottom'),  # Adjust legend position
+        margin=dict(t=200, b=50)  # Adjust top and bottom margins to accommodate title and legend
+    )
+
+    if unit1 != unit2:
+        fig.update_layout(
+        yaxis2_title=f"H2 {type2} [{unit2}]",
+        yaxis2_range=[0, None]
+        )
+        
+    # Show the figure
+    fig.show()
+
+    return(fig)
+
+
 #Function to plot violin graphs in the Appendix
 def Appendix_Violin_Setups_Europe(
     df_H2_BASE_scen_all, df_H2_NoH2_scen_all, df_H2_tot_BASE_all, df_H2_tot_NoH2_all,
