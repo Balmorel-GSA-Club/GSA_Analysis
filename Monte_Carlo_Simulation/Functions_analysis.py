@@ -3548,3 +3548,148 @@ def Post_analysis_SMR_CCS_INVC_color(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_B
     # Show the plot
     fig.show()
 
+
+
+def Import_MainResults_KPOT(file_path) :
+    
+    df = gt.Container(file_path)
+    df_SUBTECHGROUPKPOT = pd.DataFrame(df.data["SUBTECHGROUPKPOT"].records)
+    df_SUBTECHGROUPKPOT.columns = ["CCCRRRAAA", "TECH_GROUP", "SUBTECHGROUP","Value"]
+    
+    return df_SUBTECHGROUPKPOT
+
+def Import_MonteCarlo_KPOT(file_path):
+    
+    df_merged = gt.Container(file_path)
+    df_SUBTECHGROUPKPOT        = pd.DataFrame(df_merged.data["SUBTECHGROUPKPOT"].records)
+    SUBTECHGROUPKPOT_headers     = ['scenarios', 'CCCRRRAAA', 'TECH_GROUP', 'SUBTECHGROUP','Value']
+    df_SUBTECHGROUPKPOT.columns       = SUBTECHGROUPKPOT_headers
+    #drop na 
+    df_SUBTECHGROUPKPOT = df_SUBTECHGROUPKPOT.dropna()
+    #remove the word Scenario from the scenario column
+    df_SUBTECHGROUPKPOT['scenarios'] = df_SUBTECHGROUPKPOT['scenarios'].str.extract(r'(\d+)').astype(int)
+    scen = pd.unique(df_SUBTECHGROUPKPOT['scenarios']).tolist()
+
+    return df_SUBTECHGROUPKPOT, scen
+
+def LIM_RE_CAP_scen_KPOT(df_SUBTECHGROUPKPOT) :
+    
+    df_SUBTECHGROUPKPOT['C'] = df_SUBTECHGROUPKPOT['CCCRRRAAA'].map(RRR_to_CCC)
+    df_RE_SUBTECH = df_SUBTECHGROUPKPOT.groupby(['scenarios','C','TECH_GROUP'])['Value'].sum().reset_index()
+    df_RE_SUBTECH['Value'] = df_RE_SUBTECH['Value']/1000
+    
+    return df_RE_SUBTECH
+
+def RE_CAP_scen_KPOT(df_CAP, YEAR) :
+    df_CAP = df_CAP[(df_CAP['TECH_TYPE'].isin(['SOLAR-PV', 'WIND-ON', 'WIND-OFF'])) & (df_CAP['Y']==YEAR)].reset_index(drop=True)
+    df_RE_CAP = df_CAP.groupby(['scenarios','C','TECH_TYPE'])['value'].sum().reset_index()
+    
+    return df_RE_CAP
+
+# Function to Compare the RE installed capacities to the RE limits
+def COMP_RE_LIM_KPOT(df_RE_SUBTECH, df_RE_CAP, Countries: list[str], YEAR) :
+    
+    df_RE_SUBTECH = df_RE_SUBTECH[df_RE_SUBTECH['C'].isin(Countries)].reset_index(drop=True)
+    df_RE_CAP = df_RE_CAP[df_RE_CAP['C'].isin(Countries)].reset_index(drop=True)
+    
+    df_RE_SUBTECH = df_RE_SUBTECH.groupby(['scenarios','TECH_GROUP'])['Value'].sum().reset_index()
+    df_RE_CAP = df_RE_CAP.groupby(['scenarios','TECH_TYPE'])['value'].sum().reset_index()
+    
+    df_RE_SUBTECH_WINDON = df_RE_SUBTECH[df_RE_SUBTECH['TECH_GROUP']=='WINDTURBINE_ONSHORE'].reset_index(drop=True)
+    df_RE_SUBTECH_WINDOFF = df_RE_SUBTECH[df_RE_SUBTECH['TECH_GROUP']=='WINDTURBINE_OFFSHORE'].reset_index(drop=True)
+    df_RE_SUBTECH_SOLARPV = df_RE_SUBTECH[df_RE_SUBTECH['TECH_GROUP']=='SOLARPV'].reset_index(drop=True)
+    df_RE_CAP_WINDON = df_RE_CAP[df_RE_CAP['TECH_TYPE']=='WIND-ON'].reset_index(drop=True)
+    df_RE_CAP_WINDOFF = df_RE_CAP[df_RE_CAP['TECH_TYPE']=='WIND-OFF'].reset_index(drop=True)
+    df_RE_CAP_SOLARPV = df_RE_CAP[df_RE_CAP['TECH_TYPE']=='SOLAR-PV'].reset_index(drop=True)
+    
+    WINDON_RAP = df_RE_CAP_WINDON['value']/df_RE_SUBTECH_WINDON['Value']
+    WINDOFF_RAP = df_RE_CAP_WINDOFF['value']/df_RE_SUBTECH_WINDOFF['Value']
+    SOLARPV_RAP = df_RE_CAP_SOLARPV['value']/df_RE_SUBTECH_SOLARPV['Value']
+    print(WINDON_RAP, WINDOFF_RAP, SOLARPV_RAP)
+    return WINDON_RAP, WINDOFF_RAP, SOLARPV_RAP
+
+
+def Post_analysis_colormap_H2_vs_allRE_colored_by_KPOT(   
+    WINDON_RAP, WINDOFF_RAP, SOLARPV_RAP,
+    df_PRO_scen, 
+    df_H2_PRO_GREEN_scen,  
+    scen, 
+    YEAR, 
+    Countries_from, 
+    type: str, 
+    type2: str
+):
+    
+
+    df_ELEC_PRO = df_PRO_scen[
+        (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
+        (df_PRO_scen['C'].isin(Countries_from)) & 
+        (df_PRO_scen['Y'] == YEAR) & 
+        (df_PRO_scen['TECH_TYPE'].isin(type))
+    ]
+    df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+    df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+    df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+    
+    BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
+    BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+    X = BO['Production [TWh]'].values
+    y = BO['Green H2 Production [TWh]'].values
+
+
+
+    # Creating the plot
+    fig = go.Figure()
+
+    if type2 == 'WIND_ON' :
+        # Assign colors based on price categories
+        fig.add_trace(go.Scatter(
+            x=X, y=y, mode='markers', 
+            marker=dict(color=WINDON_RAP, colorscale='Portland', size=8, showscale=True,
+                        colorbar=dict(title=f"{type2} potential", len=0.6),
+            ),
+            showlegend=False
+        ))
+    
+    elif type2 == 'SOLAR_PV' :
+        # Assign colors based on price categories
+        fig.add_trace(go.Scatter(
+            x=X, y=y, mode='markers', 
+            marker=dict(color= SOLARPV_RAP, colorscale='Portland', size=8, showscale=True,
+                        colorbar=dict(title=f"{type2} potential", len=0.6),
+            ),
+            showlegend=False
+        ))
+
+    if type2 == 'WIND_OFF' :
+        # Assign colors based on price categories
+        fig.add_trace(go.Scatter(
+            x=X, y=y, mode='markers', 
+            marker=dict(color=WINDOFF_RAP, colorscale='Portland', size=8, showscale=True,
+                        colorbar=dict(title=f"{type2} potential", len=0.6),
+            ),
+            showlegend=False
+        ))
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'R² = {r2:.2f}',
+        xaxis_title= f"{type} production [TWh]",
+        yaxis_title=f"Green H2 Production [TWh]",
+        width=800,
+        height=600,
+        coloraxis_colorbar=dict(title="Production [TWh]")
+    )
+
+    fig.show()
+
