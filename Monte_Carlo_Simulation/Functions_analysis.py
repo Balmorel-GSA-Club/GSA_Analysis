@@ -1672,35 +1672,105 @@ def Post_analysis_colormap_allRE_ng(
     )), 
 
 
-
-    # Fit a linear regression model
-    reg = LinearRegression().fit(X.reshape(-1, 1), y)
-    y_pred = reg.predict(X.reshape(-1, 1))
-    r2 = r2_score(y, y_pred)
-
-    # Plot the trendline
-    fig.add_trace(go.Scatter(
-        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
-    ))
-
-    # Plot the new point
-    new_point_x = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
-    new_point_y = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
-
-    fig.add_trace(go.Scatter(
-        x=[new_point_x], y=[new_point_y],
-        mode='markers', marker=dict(color='black', size=10),
-        name='Baseline'
-    ))
-
     # Update layout
     fig.update_layout(
-        title=f'R² = {r2:.2f}',
-        xaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"{type} {type2} [TWh]",
+        xaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"Renewable {type2} (Onshore wind, Offshore wind & Solar PV) [TWh]",
         yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
         width=800,
         height=600,
     )
+    fig.show()
+
+def Post_analysis_colormap_allRE_ng_coupled( 
+    df_PRO_scen, 
+    df_H2_PRO_GREEN_scen, 
+    NatGas_Price_scenario,
+    df_PRO_scen_2050, 
+    df_H2_PRO_GREEN_scen_2050, 
+    NatGas_Price_scenario_2050,
+    scen, 
+    YEAR1,
+    YEAR2, 
+    Countries_from, 
+    type: str, 
+    type2: str
+):
+    
+
+    df_ELEC_PRO = df_PRO_scen[
+        (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') &
+        (df_PRO_scen['C'].isin(Countries_from)) &
+        (df_PRO_scen['Y'] == YEAR1) &
+        (df_PRO_scen['TECH_TYPE'].isin (type))
+    ]
+    df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
+    df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
+    df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+
+
+    df_ELEC_PRO_2050 = df_PRO_scen_2050[
+        (df_PRO_scen_2050['COMMODITY'] == 'ELECTRICITY') &
+        (df_PRO_scen_2050['C'].isin(Countries_from)) &
+        (df_PRO_scen_2050['Y'] == YEAR2) &
+        (df_PRO_scen_2050['TECH_TYPE'].isin (type))
+    ]
+    df_ELEC_PRO_2050 = df_ELEC_PRO_2050.groupby('scenarios')['value'].sum().reset_index()
+    df_ELEC_PRO_2050 = df_ELEC_PRO_2050.sort_values(by=['scenarios'], ascending=True)
+    df_ELEC_PRO_2050 = df_ELEC_PRO_2050.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
+
+    BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
+    BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+    BO_2050 = pd.concat([df_H2_PRO_GREEN_scen_2050['value'], df_ELEC_PRO_2050['value']], axis=1)
+    BO_2050.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
+
+    X = BO['Production [TWh]'].values
+    y = BO['Green H2 Production [TWh]'].values
+
+    X_2050 = BO_2050['Production [TWh]'].values
+    y_2050 = BO_2050['Green H2 Production [TWh]'].values
+    #X_all = np.concatenate([X, X_2050])
+    #y_all = np.concatenate([y, y_2050])
+    #NatGas_Price_scenario_all = np.concatenate([NatGas_Price_scenario, NatGas_Price_scenario_2050])
+
+    # Creating the plot
+    fig = go.Figure()
+
+    fig = make_subplots(
+        rows=1, cols=2, 
+        subplot_titles=[f"{YEAR1}", f"{YEAR2}"], 
+        horizontal_spacing=0.1
+    )
+   
+    # Assign colors based on price categories
+    fig.add_trace(go.Scatter(
+        x=X, y=y, mode='markers',
+        marker=dict(
+            color=NatGas_Price_scenario, colorscale='Portland', size=8, showscale=True,
+            colorbar=dict(title="Natural gas price [€/GJ]", len=0.6), 
+        ), name="",  # Removes trace name from legend
+        showlegend=False  # Ensures it does NOT appear in legend
+    ), row=1, col=1)
+
+    # --- Add 2050 Scatter Plot ---
+    fig.add_trace(go.Scatter(
+        x=X_2050, y=y_2050, mode='markers',
+        marker=dict(
+            color=NatGas_Price_scenario_2050, colorscale='Portland', size=8, showscale=False  # Hide duplicate colorbar
+        ),name="",  # Removes trace name from legend
+        showlegend=False  # Ensures it does NOT appear in legend
+    ), row=1, col=2)
+
+    # Update layout
+    fig.update_layout(
+        xaxis_title="Renewable Production (Onshore wind, Offshore wind & Solar PV) [TWh]",
+    xaxis_title_standoff=10,  # Adds spacing so it's properly visible
+    xaxis=dict(title=dict(text="Renewable Production (Onshore wind, Offshore wind & Solar PV) [TWh]", font=dict(size=16)), 
+               automargin=True, 
+               fixedrange=True),
+        yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
+        width=800,
+        height=600,)
     fig.show()
 
 def Post_analysis_colormap_ng(
@@ -3605,7 +3675,10 @@ def COMP_RE_LIM_KPOT(df_RE_SUBTECH, df_RE_CAP, Countries: list[str], YEAR) :
     WINDON_RAP = df_RE_CAP_WINDON['value']/df_RE_SUBTECH_WINDON['Value']
     WINDOFF_RAP = df_RE_CAP_WINDOFF['value']/df_RE_SUBTECH_WINDOFF['Value']
     SOLARPV_RAP = df_RE_CAP_SOLARPV['value']/df_RE_SUBTECH_SOLARPV['Value']
-    print(WINDON_RAP, WINDOFF_RAP, SOLARPV_RAP)
+    print('CAP WINDOFF', max(df_RE_CAP_WINDOFF['value']), min(df_RE_CAP_WINDOFF['value']))
+    print('CAP WINDON', max(df_RE_CAP_WINDON['value']), min(df_RE_CAP_WINDON['value']))
+    print('CAP SOLARPV', max(df_RE_CAP_SOLARPV['value']), min(df_RE_CAP_SOLARPV['value']))
+
     return WINDON_RAP, WINDOFF_RAP, SOLARPV_RAP
 
 
@@ -3647,6 +3720,8 @@ def Post_analysis_colormap_H2_vs_allRE_colored_by_KPOT(
         fig.add_trace(go.Scatter(
             x=X, y=y, mode='markers', 
             marker=dict(color=WINDON_RAP, colorscale='Portland', size=8, showscale=True,
+            cmin=0,  # Set colorbar minimum
+            cmax=1,  # Set colorbar maximum
                         colorbar=dict(title=f"{type2} potential", len=0.6),
             ),
             showlegend=False
@@ -3657,6 +3732,8 @@ def Post_analysis_colormap_H2_vs_allRE_colored_by_KPOT(
         fig.add_trace(go.Scatter(
             x=X, y=y, mode='markers', 
             marker=dict(color= SOLARPV_RAP, colorscale='Portland', size=8, showscale=True,
+            cmin=0,  # Set colorbar minimum
+            cmax=1,  # Set colorbar maximum
                         colorbar=dict(title=f"{type2} potential", len=0.6),
             ),
             showlegend=False
@@ -3666,8 +3743,10 @@ def Post_analysis_colormap_H2_vs_allRE_colored_by_KPOT(
         # Assign colors based on price categories
         fig.add_trace(go.Scatter(
             x=X, y=y, mode='markers', 
-            marker=dict(color=WINDOFF_RAP, colorscale='Portland', size=8, showscale=True,
-                        colorbar=dict(title=f"{type2} potential", len=0.6),
+            marker=dict(color=WINDOFF_RAP, colorscale='Portland', size=8, showscale=True, 
+            cmin=0,  # Set colorbar minimum
+            cmax=1,  # Set colorbar maximum
+            colorbar=dict(title=f"{type2} potential", len=0.6),
             ),
             showlegend=False
         ))
