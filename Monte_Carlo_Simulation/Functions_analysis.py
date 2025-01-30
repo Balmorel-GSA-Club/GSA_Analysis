@@ -1761,16 +1761,27 @@ def Post_analysis_colormap_allRE_ng_coupled(
         showlegend=False  # Ensures it does NOT appear in legend
     ), row=1, col=2)
 
-    # Update layout
     fig.update_layout(
-        xaxis_title="Renewable Production (Onshore wind, Offshore wind & Solar PV) [TWh]",
-    xaxis_title_standoff=10,  # Adds spacing so it's properly visible
-    xaxis=dict(title=dict(text="Renewable Production (Onshore wind, Offshore wind & Solar PV) [TWh]", font=dict(size=16)), 
-               automargin=True, 
-               fixedrange=True),
-        yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
-        width=800,
-        height=600,)
+    annotations=[
+        dict(
+            x=0.5,  # Center the title
+            y=-0.1,
+            xref="paper",  # Refers to the entire figure
+            yref="paper",
+            text="Renewable Production (Onshore wind, Offshore wind & Solar PV) [TWh]",
+            showarrow=False,
+            font=dict(size=14)
+        )
+    ],
+    showlegend=False,  # Remove legend from the overall plot
+    xaxis=dict(domain=[0, 0.4], title="2030", title_standoff=50, anchor='y' ),
+    xaxis2=dict(domain=[0.6, 1], title="2050", title_standoff=50, anchor='y' ),
+    yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
+    width=800,
+    height=600,
+    #xaxis=dict(domain=[0, 0.4]),  # Set domain for first subplot
+    #xaxis2=dict(domain=[0.6, 1]),  # Set domain for second subplot
+)
     fig.show()
 
 def Post_analysis_colormap_ng(
@@ -3722,7 +3733,7 @@ def Post_analysis_colormap_H2_vs_allRE_colored_by_KPOT(
             marker=dict(color=WINDON_RAP, colorscale='Portland', size=8, showscale=True,
             cmin=0,  # Set colorbar minimum
             cmax=1,  # Set colorbar maximum
-                        colorbar=dict(title=f"{type2} potential", len=0.6),
+                        colorbar=dict(title="Onshore wind potential", len=0.6),
             ),
             showlegend=False
         ))
@@ -3734,7 +3745,7 @@ def Post_analysis_colormap_H2_vs_allRE_colored_by_KPOT(
             marker=dict(color= SOLARPV_RAP, colorscale='Portland', size=8, showscale=True,
             cmin=0,  # Set colorbar minimum
             cmax=1,  # Set colorbar maximum
-                        colorbar=dict(title=f"{type2} potential", len=0.6),
+                        colorbar=dict(title="Solar PV potential", len=0.6),
             ),
             showlegend=False
         ))
@@ -3746,7 +3757,7 @@ def Post_analysis_colormap_H2_vs_allRE_colored_by_KPOT(
             marker=dict(color=WINDOFF_RAP, colorscale='Portland', size=8, showscale=True, 
             cmin=0,  # Set colorbar minimum
             cmax=1,  # Set colorbar maximum
-            colorbar=dict(title=f"{type2} potential", len=0.6),
+            colorbar=dict(title="Solar PV potential", len=0.6),
             ),
             showlegend=False
         ))
@@ -3755,15 +3766,11 @@ def Post_analysis_colormap_H2_vs_allRE_colored_by_KPOT(
     y_pred = reg.predict(X.reshape(-1, 1))
     r2 = r2_score(y, y_pred)
 
-    # Plot the trendline
-    fig.add_trace(go.Scatter(
-        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
-    ))
+    
 
     # Update layout
     fig.update_layout(
-        title=f'R² = {r2:.2f}',
-        xaxis_title= f"{type} production [TWh]",
+        xaxis_title= "Renewable Production (Onshore wind, Offshore wind & Solar PV) [TWh]",
         yaxis_title=f"Green H2 Production [TWh]",
         width=800,
         height=600,
