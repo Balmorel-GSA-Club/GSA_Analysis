@@ -886,11 +886,10 @@ def Violin_Setups_Europe(
                             marker=dict(color='#3C3D37', size=10), name='Baseline Base EU North'))
 
     # Plot NoH2 EU North
-    if YEAR == '2030':
-        fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU North']['value'], name='No H2 Target EU North',
-                                box_visible=True, line_color=color))
-        fig.add_trace(go.Scatter(x=['No H2 Target EU North'], y=[baseline_y[1]], mode='markers',
-                                marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU North'))
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU North']['value'], name='No H2 Target EU North',
+                            box_visible=True, line_color=color))
+    fig.add_trace(go.Scatter(x=['No H2 Target EU North'], y=[baseline_y[1]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU North'))
     
     # Plot Base EU South
     fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Base EU South']['value'], name='Base EU South',
@@ -899,11 +898,10 @@ def Violin_Setups_Europe(
                             marker=dict(color='#3C3D37', size=10), name='Baseline Base EU South'))
 
     # Plot NoH2 EU South
-    if YEAR == '2030':
-        fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU South']['value'], name='No H2 Target EU South',
-                                box_visible=True, line_color=color))
-        fig.add_trace(go.Scatter(x=['No H2 Target EU South'], y=[baseline_y[3]], mode='markers',
-                                marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU South'))
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU South']['value'], name='No H2 Target EU South',
+                            box_visible=True, line_color=color))
+    fig.add_trace(go.Scatter(x=['No H2 Target EU South'], y=[baseline_y[3]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU South'))
 
     # Plot Base EU West
     fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Base EU West']['value'], name='Base EU West',
@@ -912,11 +910,10 @@ def Violin_Setups_Europe(
                             marker=dict(color='#3C3D37', size=10), name='Baseline Base EU West'))
 
     # Plot NoH2 EU West
-    if YEAR == '2030':
-        fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU West']['value'], name='No H2 Target EU West',
-                                box_visible=True, line_color=color))
-        fig.add_trace(go.Scatter(x=['No H2 Target EU West'], y=[baseline_y[5]], mode='markers',
-                                marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU West'))
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU West']['value'], name='No H2 Target EU West',
+                            box_visible=True, line_color=color))
+    fig.add_trace(go.Scatter(x=['No H2 Target EU West'], y=[baseline_y[5]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU West'))
 
     # Plot Base EU East
     fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'Base EU East']['value'], name='Base EU East',
@@ -925,11 +922,10 @@ def Violin_Setups_Europe(
                             marker=dict(color='#3C3D37', size=10), name='Baseline Base EU East'))
 
     # Plot NoH2 EU East
-    if YEAR == '2030':
-        fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU East']['value'], name='No H2 Target EU East',
-                                box_visible=True, line_color=color))
-        fig.add_trace(go.Scatter(x=['No H2 Target EU East'], y=[baseline_y[7]], mode='markers',
-                                marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU East'))
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == 'No H2 Target EU East']['value'], name='No H2 Target EU East',
+                            box_visible=True, line_color=color))
+    fig.add_trace(go.Scatter(x=['No H2 Target EU East'], y=[baseline_y[7]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline No H2 Target EU East'))
     
 
      
@@ -945,7 +941,20 @@ def Violin_Setups_Europe(
         height=600,
         width=1200,
         legend=dict(orientation='h', x=0.5, y=1, xanchor='center', yanchor='bottom'),  # Adjust legend position
-        margin=dict(t=200, b=50)  # Adjust top and bottom margins to accommodate title and legend
+        margin=dict(t=200, b=50),  # Adjust top and bottom margins to accommodate title and legend
+        plot_bgcolor='white',  # Set background color to white
+        xaxis=dict(
+            tickfont=dict(size=12),  # Set font size for x-axis title
+            tickangle=0,  # Set tick labels to be horizontal
+            tickmode='array'
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor='black',
+            gridwidth=1,
+            tickfont=dict(size=16),
+            title_font=dict(size=16)
+        )
     )
 
     # Show the figure
@@ -956,7 +965,7 @@ def Violin_Setups_Europe(
 
 # Function to violin plot the distribution of different hydrogen information for one region
 
-def Violin_Setups_OneRegion(
+def Violin_2Setups_OneRegion(
     df_H2_1_BASE_scen_EU, df_H2_1_NoH2_scen_EU, df_H2_1_tot_BASE_EU, df_H2_1_tot_NoH2_EU,
     df_H2_2_BASE_scen_EU, df_H2_2_NoH2_scen_EU, df_H2_2_tot_BASE_EU, df_H2_2_tot_NoH2_EU,
     YEAR, type1: str, type2: str
@@ -965,11 +974,11 @@ def Violin_Setups_OneRegion(
         raise ValueError(f"Invalid type: {type1}")
     if type2 not in ["Green Capacity", "Blue Capacity", "Green Production", "Blue Production", "Storage", "Transmission Capacity", "Transmission Flow"]: 
         raise ValueError(f"Invalid type: {type2}")
-    print(df_H2_GREEN_BASE_scen_EU)
+    
     # Baseline values
     baseline_y = np.array([
-        df_H2_GREEN_tot_BASE_EU, df_H2_GREEN_tot_NoH2_EU,
-        df_H2_BLUE_tot_BASE_EU, df_H2_BLUE_tot_NoH2_EU,
+        df_H2_1_tot_BASE_EU, df_H2_1_tot_NoH2_EU,
+        df_H2_2_tot_BASE_EU, df_H2_2_tot_NoH2_EU,
     ])
 
     # Assign categories
@@ -1014,10 +1023,10 @@ def Violin_Setups_OneRegion(
     # Create plot
     if unit1 != unit2:
         fig = make_subplots(specs=[[{"secondary_y": True}]])
-        second_axis = False
-    else : 
-        fig = go.Figure()
         second_axis = True
+    else : 
+        fig = make_subplots(specs=[[{"secondary_y": False}]])
+        second_axis = False
 
     # Plot Base 1
     fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == type1 + ' Base']['value'], name=type1 + ' Base',
@@ -1046,7 +1055,7 @@ def Violin_Setups_OneRegion(
      
     fig.update_layout(
         title={
-            'text': f'Violin Plot: Value Distribution of H2 {type1} and {type2} in ({YEAR})',
+            'text': f'Violin Plot: Value Distribution of H2 {type1} and {type2} in {YEAR}',
             'font': {'size': 16}, 
             
         },
@@ -1054,9 +1063,20 @@ def Violin_Setups_OneRegion(
         yaxis_title=f"H2 {type1} [{unit1}]",
         yaxis_range=[0, None],
         height=600,
-        width=1200,
+        width=1000,
         legend=dict(orientation='h', x=0.5, y=1, xanchor='center', yanchor='bottom'),  # Adjust legend position
-        margin=dict(t=200, b=50)  # Adjust top and bottom margins to accommodate title and legend
+        margin=dict(t=200, b=50),  # Adjust top and bottom margins to accommodate title and legend
+        plot_bgcolor='white',  # Set background color to white
+        xaxis=dict(
+            tickfont=dict(size=15)  # Set font size for x-axis title
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor='black',
+            gridwidth=1,
+            tickfont=dict(size=16),
+            title_font=dict(size=16)
+        )
     )
 
     if unit1 != unit2:
@@ -1064,6 +1084,90 @@ def Violin_Setups_OneRegion(
         yaxis2_title=f"H2 {type2} [{unit2}]",
         yaxis2_range=[0, None]
         )
+        
+    # Show the figure
+    fig.show()
+
+    return(fig)
+
+def Violin_1Setups_OneRegion(
+    df_H2_1_BASE_scen_EU, df_H2_1_NoH2_scen_EU, df_H2_1_tot_BASE_EU, df_H2_1_tot_NoH2_EU,
+    YEAR, type1: str
+):
+    if type1 not in ["Green Capacity", "Blue Capacity", "Green Production", "Blue Production", "Storage", "Transmission Capacity", "Transmission Flow"] : 
+        raise ValueError(f"Invalid type: {type1}")
+    
+    # Baseline values
+    baseline_y = np.array([
+        df_H2_1_tot_BASE_EU, df_H2_1_tot_NoH2_EU
+    ])
+
+    # Assign categories
+    df_H2_1_BASE_scen_EU['category'] = type1 + ' Base'
+    df_H2_1_NoH2_scen_EU['category'] = type1 + ' No H2 Target'
+
+    # Combine all dataframes
+    combined_df = pd.concat([
+        df_H2_1_BASE_scen_EU, df_H2_1_NoH2_scen_EU
+    ])
+
+    # Determine color and unit
+    color_dict = {
+        "Green Capacity": 'green',
+        "Green Production": 'green',
+        "Blue Capacity": 'blue',
+        "Blue Production": 'blue',
+        "Storage": 'orange',
+        "Transmission Capacity": 'red',
+        "Transmission Flow": 'red'
+    }
+
+    unit_dict = {
+        "Green Capacity": 'GW',
+        "Green Production": 'TWh',
+        "Blue Capacity": 'GW',
+        "Blue Production": 'TWh',
+        "Storage": 'TWh',
+        "Transmission Capacity": 'GW',
+        "Transmission Flow": 'TWh'
+    }
+
+    color1 = color_dict.get(type1, 'black')
+    unit1 = unit_dict.get(type1, 'units')
+
+
+    # Create plot
+    
+    fig = make_subplots(specs=[[{"secondary_y": False}]])
+    second_axis = False
+
+    # Plot Base 1
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == type1 + ' Base']['value'], name=type1 + ' Base',
+                            box_visible=True, line_color=color1), secondary_y=False)
+    fig.add_trace(go.Scatter(x=[type1 + ' Base'], y=[baseline_y[0]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline ' + type1 + ' Base'), secondary_y=False)
+
+    # Plot NoH2 1
+    fig.add_trace(go.Violin(y=combined_df[combined_df['category'] == type1 + ' No H2 Target']['value'], name=type1 + ' No H2 Target',
+                            box_visible=True, line_color=color1), secondary_y=False)
+    fig.add_trace(go.Scatter(x=[type1 + ' No H2 Target'], y=[baseline_y[1]], mode='markers',
+                            marker=dict(color='#3C3D37', size=10), name='Baseline ' + type1 + ' No H2 Target'), secondary_y=False)
+    
+     
+    fig.update_layout(
+        title={
+            'text': f'Violin Plot: Value Distribution of H2 {type1} in {YEAR}',
+            'font': {'size': 16}, 
+            
+        },
+
+        yaxis_title=f"H2 {type1} [{unit1}]",
+        yaxis_range=[0, None],
+        height=600,
+        width=600,
+        legend=dict(orientation='h', x=0.5, y=1, xanchor='center', yanchor='bottom'),  # Adjust legend position
+        margin=dict(t=200, b=50)  # Adjust top and bottom margins to accommodate title and legend
+    )
         
     # Show the figure
     fig.show()
@@ -1672,116 +1776,35 @@ def Post_analysis_colormap_allRE_ng(
     )), 
 
 
+
+    # Fit a linear regression model
+    reg = LinearRegression().fit(X.reshape(-1, 1), y)
+    y_pred = reg.predict(X.reshape(-1, 1))
+    r2 = r2_score(y, y_pred)
+
+    # Plot the trendline
+    fig.add_trace(go.Scatter(
+        x=X, y=y_pred, mode='lines', name='Trendline', line=dict(color='black')
+    ))
+
+    # Plot the new point
+    new_point_x = df_BASE_ELEC_CAP_tot if type2 == "Capacity" else df_BASE_ELEC_PRO_tot
+    new_point_y = df_H2_CAP_GREEN_tot_BASE if type2 == "Capacity" else df_H2_PRO_GREEN_tot_BASE
+
+    fig.add_trace(go.Scatter(
+        x=[new_point_x], y=[new_point_y],
+        mode='markers', marker=dict(color='black', size=10),
+        name='Baseline'
+    ))
+
     # Update layout
     fig.update_layout(
-        xaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"Renewable {type2} (Onshore wind, Offshore wind & Solar PV) [TWh]",
+        title=f'R² = {r2:.2f}',
+        xaxis_title=f"{type} {type2} [GW]" if type2 == "Capacity" else f"{type} {type2} [TWh]",
         yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
         width=800,
         height=600,
     )
-    fig.show()
-
-def Post_analysis_colormap_allRE_ng_coupled( 
-    df_PRO_scen, 
-    df_H2_PRO_GREEN_scen, 
-    NatGas_Price_scenario,
-    df_PRO_scen_2050, 
-    df_H2_PRO_GREEN_scen_2050, 
-    NatGas_Price_scenario_2050,
-    scen, 
-    YEAR1,
-    YEAR2, 
-    Countries_from, 
-    type: str, 
-    type2: str
-):
-    
-
-    df_ELEC_PRO = df_PRO_scen[
-        (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') &
-        (df_PRO_scen['C'].isin(Countries_from)) &
-        (df_PRO_scen['Y'] == YEAR1) &
-        (df_PRO_scen['TECH_TYPE'].isin (type))
-    ]
-    df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
-    df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
-    df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
-
-
-    df_ELEC_PRO_2050 = df_PRO_scen_2050[
-        (df_PRO_scen_2050['COMMODITY'] == 'ELECTRICITY') &
-        (df_PRO_scen_2050['C'].isin(Countries_from)) &
-        (df_PRO_scen_2050['Y'] == YEAR2) &
-        (df_PRO_scen_2050['TECH_TYPE'].isin (type))
-    ]
-    df_ELEC_PRO_2050 = df_ELEC_PRO_2050.groupby('scenarios')['value'].sum().reset_index()
-    df_ELEC_PRO_2050 = df_ELEC_PRO_2050.sort_values(by=['scenarios'], ascending=True)
-    df_ELEC_PRO_2050 = df_ELEC_PRO_2050.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
-
-    BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
-    BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
-
-    BO_2050 = pd.concat([df_H2_PRO_GREEN_scen_2050['value'], df_ELEC_PRO_2050['value']], axis=1)
-    BO_2050.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
-
-    X = BO['Production [TWh]'].values
-    y = BO['Green H2 Production [TWh]'].values
-
-    X_2050 = BO_2050['Production [TWh]'].values
-    y_2050 = BO_2050['Green H2 Production [TWh]'].values
-    #X_all = np.concatenate([X, X_2050])
-    #y_all = np.concatenate([y, y_2050])
-    #NatGas_Price_scenario_all = np.concatenate([NatGas_Price_scenario, NatGas_Price_scenario_2050])
-
-    # Creating the plot
-    fig = go.Figure()
-
-    fig = make_subplots(
-        rows=1, cols=2, 
-        subplot_titles=[f"{YEAR1}", f"{YEAR2}"], 
-        horizontal_spacing=0.1
-    )
-   
-    # Assign colors based on price categories
-    fig.add_trace(go.Scatter(
-        x=X, y=y, mode='markers',
-        marker=dict(
-            color=NatGas_Price_scenario, colorscale='Portland', size=8, showscale=True,
-            colorbar=dict(title="Natural gas price [€/GJ]", len=0.6), 
-        ), name="",  # Removes trace name from legend
-        showlegend=False  # Ensures it does NOT appear in legend
-    ), row=1, col=1)
-
-    # --- Add 2050 Scatter Plot ---
-    fig.add_trace(go.Scatter(
-        x=X_2050, y=y_2050, mode='markers',
-        marker=dict(
-            color=NatGas_Price_scenario_2050, colorscale='Portland', size=8, showscale=False  # Hide duplicate colorbar
-        ),name="",  # Removes trace name from legend
-        showlegend=False  # Ensures it does NOT appear in legend
-    ), row=1, col=2)
-
-    fig.update_layout(
-    annotations=[
-        dict(
-            x=0.5,  # Center the title
-            y=-0.1,
-            xref="paper",  # Refers to the entire figure
-            yref="paper",
-            text="Renewable Production (Onshore wind, Offshore wind & Solar PV) [TWh]",
-            showarrow=False,
-            font=dict(size=14)
-        )
-    ],
-    showlegend=False,  # Remove legend from the overall plot
-    xaxis=dict(domain=[0, 0.4], title="2030", title_standoff=50, anchor='y' ),
-    xaxis2=dict(domain=[0.6, 1], title="2050", title_standoff=50, anchor='y' ),
-    yaxis_title=f"Green H2 {type2} [GW]" if type2 == "Capacity" else f"Green H2 {type2} [TWh]",
-    width=800,
-    height=600,
-    #xaxis=dict(domain=[0, 0.4]),  # Set domain for first subplot
-    #xaxis2=dict(domain=[0.6, 1]),  # Set domain for second subplot
-)
     fig.show()
 
 def Post_analysis_colormap_ng(
@@ -3627,155 +3650,5 @@ def Post_analysis_SMR_CCS_INVC_color(df_H2_CAP_GREEN_scen, df_H2_CAP_GREEN_tot_B
     )
 
     # Show the plot
-    fig.show()
-
-
-
-def Import_MainResults_KPOT(file_path) :
-    
-    df = gt.Container(file_path)
-    df_SUBTECHGROUPKPOT = pd.DataFrame(df.data["SUBTECHGROUPKPOT"].records)
-    df_SUBTECHGROUPKPOT.columns = ["CCCRRRAAA", "TECH_GROUP", "SUBTECHGROUP","Value"]
-    
-    return df_SUBTECHGROUPKPOT
-
-def Import_MonteCarlo_KPOT(file_path):
-    
-    df_merged = gt.Container(file_path)
-    df_SUBTECHGROUPKPOT        = pd.DataFrame(df_merged.data["SUBTECHGROUPKPOT"].records)
-    SUBTECHGROUPKPOT_headers     = ['scenarios', 'CCCRRRAAA', 'TECH_GROUP', 'SUBTECHGROUP','Value']
-    df_SUBTECHGROUPKPOT.columns       = SUBTECHGROUPKPOT_headers
-    #drop na 
-    df_SUBTECHGROUPKPOT = df_SUBTECHGROUPKPOT.dropna()
-    #remove the word Scenario from the scenario column
-    df_SUBTECHGROUPKPOT['scenarios'] = df_SUBTECHGROUPKPOT['scenarios'].str.extract(r'(\d+)').astype(int)
-    scen = pd.unique(df_SUBTECHGROUPKPOT['scenarios']).tolist()
-
-    return df_SUBTECHGROUPKPOT, scen
-
-def LIM_RE_CAP_scen_KPOT(df_SUBTECHGROUPKPOT) :
-    
-    df_SUBTECHGROUPKPOT['C'] = df_SUBTECHGROUPKPOT['CCCRRRAAA'].map(RRR_to_CCC)
-    df_RE_SUBTECH = df_SUBTECHGROUPKPOT.groupby(['scenarios','C','TECH_GROUP'])['Value'].sum().reset_index()
-    df_RE_SUBTECH['Value'] = df_RE_SUBTECH['Value']/1000
-    
-    return df_RE_SUBTECH
-
-def RE_CAP_scen_KPOT(df_CAP, YEAR) :
-    df_CAP = df_CAP[(df_CAP['TECH_TYPE'].isin(['SOLAR-PV', 'WIND-ON', 'WIND-OFF'])) & (df_CAP['Y']==YEAR)].reset_index(drop=True)
-    df_RE_CAP = df_CAP.groupby(['scenarios','C','TECH_TYPE'])['value'].sum().reset_index()
-    
-    return df_RE_CAP
-
-# Function to Compare the RE installed capacities to the RE limits
-def COMP_RE_LIM_KPOT(df_RE_SUBTECH, df_RE_CAP, Countries: list[str], YEAR) :
-    
-    df_RE_SUBTECH = df_RE_SUBTECH[df_RE_SUBTECH['C'].isin(Countries)].reset_index(drop=True)
-    df_RE_CAP = df_RE_CAP[df_RE_CAP['C'].isin(Countries)].reset_index(drop=True)
-    
-    df_RE_SUBTECH = df_RE_SUBTECH.groupby(['scenarios','TECH_GROUP'])['Value'].sum().reset_index()
-    df_RE_CAP = df_RE_CAP.groupby(['scenarios','TECH_TYPE'])['value'].sum().reset_index()
-    
-    df_RE_SUBTECH_WINDON = df_RE_SUBTECH[df_RE_SUBTECH['TECH_GROUP']=='WINDTURBINE_ONSHORE'].reset_index(drop=True)
-    df_RE_SUBTECH_WINDOFF = df_RE_SUBTECH[df_RE_SUBTECH['TECH_GROUP']=='WINDTURBINE_OFFSHORE'].reset_index(drop=True)
-    df_RE_SUBTECH_SOLARPV = df_RE_SUBTECH[df_RE_SUBTECH['TECH_GROUP']=='SOLARPV'].reset_index(drop=True)
-    df_RE_CAP_WINDON = df_RE_CAP[df_RE_CAP['TECH_TYPE']=='WIND-ON'].reset_index(drop=True)
-    df_RE_CAP_WINDOFF = df_RE_CAP[df_RE_CAP['TECH_TYPE']=='WIND-OFF'].reset_index(drop=True)
-    df_RE_CAP_SOLARPV = df_RE_CAP[df_RE_CAP['TECH_TYPE']=='SOLAR-PV'].reset_index(drop=True)
-    
-    WINDON_RAP = df_RE_CAP_WINDON['value']/df_RE_SUBTECH_WINDON['Value']
-    WINDOFF_RAP = df_RE_CAP_WINDOFF['value']/df_RE_SUBTECH_WINDOFF['Value']
-    SOLARPV_RAP = df_RE_CAP_SOLARPV['value']/df_RE_SUBTECH_SOLARPV['Value']
-    print('CAP WINDOFF', max(df_RE_CAP_WINDOFF['value']), min(df_RE_CAP_WINDOFF['value']))
-    print('CAP WINDON', max(df_RE_CAP_WINDON['value']), min(df_RE_CAP_WINDON['value']))
-    print('CAP SOLARPV', max(df_RE_CAP_SOLARPV['value']), min(df_RE_CAP_SOLARPV['value']))
-
-    return WINDON_RAP, WINDOFF_RAP, SOLARPV_RAP
-
-
-def Post_analysis_colormap_H2_vs_allRE_colored_by_KPOT(   
-    WINDON_RAP, WINDOFF_RAP, SOLARPV_RAP,
-    df_PRO_scen, 
-    df_H2_PRO_GREEN_scen,  
-    scen, 
-    YEAR, 
-    Countries_from, 
-    type: str, 
-    type2: str
-):
-    
-
-    df_ELEC_PRO = df_PRO_scen[
-        (df_PRO_scen['COMMODITY'] == 'ELECTRICITY') & 
-        (df_PRO_scen['C'].isin(Countries_from)) & 
-        (df_PRO_scen['Y'] == YEAR) & 
-        (df_PRO_scen['TECH_TYPE'].isin(type))
-    ]
-    df_ELEC_PRO = df_ELEC_PRO.groupby('scenarios')['value'].sum().reset_index()
-    df_ELEC_PRO = df_ELEC_PRO.sort_values(by=['scenarios'], ascending=True)
-    df_ELEC_PRO = df_ELEC_PRO.set_index('scenarios').reindex(scen, fill_value=0).reset_index(drop=True)
-    
-    BO = pd.concat([df_H2_PRO_GREEN_scen['value'], df_ELEC_PRO['value']], axis=1)
-    BO.columns = ['Green H2 Production [TWh]', 'Production [TWh]']
-
-    X = BO['Production [TWh]'].values
-    y = BO['Green H2 Production [TWh]'].values
-
-
-
-    # Creating the plot
-    fig = go.Figure()
-
-    if type2 == 'WIND_ON' :
-        # Assign colors based on price categories
-        fig.add_trace(go.Scatter(
-            x=X, y=y, mode='markers', 
-            marker=dict(color=WINDON_RAP, colorscale='Portland', size=8, showscale=True,
-            cmin=0,  # Set colorbar minimum
-            cmax=1,  # Set colorbar maximum
-                        colorbar=dict(title="Onshore wind potential", len=0.6),
-            ),
-            showlegend=False
-        ))
-    
-    elif type2 == 'SOLAR_PV' :
-        # Assign colors based on price categories
-        fig.add_trace(go.Scatter(
-            x=X, y=y, mode='markers', 
-            marker=dict(color= SOLARPV_RAP, colorscale='Portland', size=8, showscale=True,
-            cmin=0,  # Set colorbar minimum
-            cmax=1,  # Set colorbar maximum
-                        colorbar=dict(title="Solar PV potential", len=0.6),
-            ),
-            showlegend=False
-        ))
-
-    if type2 == 'WIND_OFF' :
-        # Assign colors based on price categories
-        fig.add_trace(go.Scatter(
-            x=X, y=y, mode='markers', 
-            marker=dict(color=WINDOFF_RAP, colorscale='Portland', size=8, showscale=True, 
-            cmin=0,  # Set colorbar minimum
-            cmax=1,  # Set colorbar maximum
-            colorbar=dict(title="Solar PV potential", len=0.6),
-            ),
-            showlegend=False
-        ))
-    # Fit a linear regression model
-    reg = LinearRegression().fit(X.reshape(-1, 1), y)
-    y_pred = reg.predict(X.reshape(-1, 1))
-    r2 = r2_score(y, y_pred)
-
-    
-
-    # Update layout
-    fig.update_layout(
-        xaxis_title= "Renewable Production (Onshore wind, Offshore wind & Solar PV) [TWh]",
-        yaxis_title=f"Green H2 Production [TWh]",
-        width=800,
-        height=600,
-        coloraxis_colorbar=dict(title="Production [TWh]")
-    )
-
     fig.show()
 
