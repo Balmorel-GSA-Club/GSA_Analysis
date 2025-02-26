@@ -22,6 +22,12 @@ import plotly.express as px
 ###          0. Hard coded          ###
 ### ------------------------------- ###
 
+EU_North = ['DENMARK', 'NORWAY', 'SWEDEN', 'FINLAND', 'ESTONIA', 'LATVIA', 'LITHUANIA']
+EU_West = ['FRANCE', 'GERMANY', 'NETHERLANDS', 'UNITED-KINGDOM', 'BELGIUM', 'LUXEMBOURG', 'AUSTRIA', 'SWITZERLAND', 'IRELAND']
+EU_East = ['POLAND', 'CZECH_REPUBLIC', 'SLOVAKIA', 'ROMANIA', 'BULGARIA', 'HUNGARY']
+EU_South = ['ITALY', 'SPAIN', 'PORTUGAL', 'SLOVENIA', 'CROATIA', 'ALBANIA', 'MALTA', 'CYPRUS', 'BOSNIA_AND_HERZEGOVINA', 'MONTENEGRO', 'NORTH_MACEDONIA', 'SERBIA', 'GREECE']
+EU = EU_North + EU_West + EU_East + EU_South
+
 RRR_to_CCC = {
     'DK1': 'DENMARK','DK2': 'DENMARK','FIN': 'FINLAND','NO1': 'NORWAY','NO2': 'NORWAY','NO3': 'NORWAY','NO4': 'NORWAY','NO5': 'NORWAY','SE1': 'SWEDEN',
     'SE2': 'SWEDEN', 'SE3': 'SWEDEN','SE4': 'SWEDEN','UK': 'UNITED_KINGDOM','EE': 'ESTONIA','LV': 'LATVIA','LT': 'LITHUANIA','PL': 'POLAND','BE': 'BELGIUM',
@@ -43,7 +49,27 @@ results_selections = ["Elec RE Capacity","Elec PV Capacity", "Elec ONSHORE Capac
                       "H2 Import Capacity", "H2 Import Production", "H2 Storage", 
                       "H2 Transmission Capacity", "H2 Transmission Flow"]
 
-input_data_selections = ["NATGAS_P", "CO2_TAX", "SMR_CCS_INVC", "PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST","ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH"]
+results_color = {"Elec RE Capacity":"green","Elec PV Capacity":"yellow", "Elec ONSHORE Capacity":"lightblue", "Elec OFFSHORE Capacity":"darkblue",
+                 "Elec RE Production":"green","Elec PV Production":"yellow", "Elec ONSHORE Production":"lightblue", "Elec OFFSHORE Production":"darkblue", 
+                 "H2 Green Capacity":"green", "H2 Blue Capacity":"blue", "H2 Green Production":"green", "H2 Blue Production":"blue", 
+                 "H2 Import Capacity":"orange", "H2 Import Production":"orange", "H2 Storage":"orange", 
+                 "H2 Transmission Capacity":"red", "H2 Transmission Flow":"red"}
+
+results_unit = {"Elec RE Capacity":"GW","Elec PV Capacity":"GW", "Elec ONSHORE Capacity":"GW", "Elec OFFSHORE Capacity":"GW",
+                "Elec RE Production":"TWh","Elec PV Production":"TWh", "Elec ONSHORE Production":"TWh", "Elec OFFSHORE Production":"TWh", 
+                "H2 Green Capacity":"GW", "H2 Blue Capacity":"GW", "H2 Green Production":"TWh", "H2 Blue Production":"TWh", 
+                "H2 Import Capacity":"GW", "H2 Import Production":"TWh", "H2 Storage":"TWh", 
+                "H2 Transmission Capacity":"GW", "H2 Transmission Flow":"TWh"}
+
+input_data_selections = ["NATGAS_P", "CO2_TAX", "SMR_CCS_INVC", "PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST",
+                         "ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH"]
+
+input_data_geography = {"PV_LIMIT_NORTH":EU_North,"PV_LIMIT_SOUTH":EU_South,"PV_LIMIT_EAST":EU_East,"PV_LIMIT_WEST":EU_West,
+                        "ONS_LIMIT_EAST":EU_East,"ONS_LIMIT_WEST":EU_West,"ONS_LIMIT_NORTH":EU_North,"ONS_LIMIT_SOUTH":EU_South}
+
+input_data_unit = {"NATGAS_P":"€/GJ", "CO2_TAX":"€/tCO2", "SMR_CCS_INVC":"€/MW", 
+                   "PV_LIMIT_NORTH":"GW", "PV_LIMIT_SOUTH":"GW", "PV_LIMIT_EAST":"GW", "PV_LIMIT_WEST":"GW",
+                   "ONS_LIMIT_EAST":"GW", "ONS_LIMIT_WEST":"GW", "ONS_LIMIT_NORTH":"GW", "ONS_LIMIT_SOUTH":"GW"}
 
 #%% ------------------------------- ###
 ###            1. Class             ###
@@ -256,6 +282,10 @@ class MainResults_GSA:
         if selection in ["H2 Transmission Capacity", "H2 Transmission Flow"]:
             df['CI'] = df['IRRRI'].map(RRR_to_CCC)
             df = df[~df["CI"].isin(Countries)]
+            
+        # Transformation of units if needed
+        if selection == "H2 Storage":
+            df['value'] = df['value'] / 1000
         
         if selection in ["Elec RE Capacity","Elec PV Capacity", "Elec ONSHORE Capacity", "Elec OFFSHORE Capacity",
                          "Elec RE Production","Elec PV Production", "Elec ONSHORE Production", "Elec OFFSHORE Production",
@@ -291,18 +321,20 @@ class MainResults_GSA:
             
         # KPOT of the subtechnology group
         if selection in ["PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST","ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH"]:
-            Regions = [key for key, value in RRR_to_CCC.items() if value in Countries] # To get the regions associated to the countries
+            print("You have selected a geography dependant input data. The correct geography has been selected.")
+            Geography = input_data_geography[selection]
+            Regions = [key for key, value in RRR_to_CCC.items() if value in Geography] # To get the regions associated to the countries
             df = self.baseline_input_data["SUBTECHGROUPKPOT"]
             if selection in ["PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST"]:
                 df = df[(df["TECH_GROUP"]=="SOLARPV") & (df['CCCRRRAAA'].isin(Regions))]
             elif selection in ["ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH"]:
                 df = df[(df["TECH_GROUP"]=="WINDTURBINE_ONSHORE") & (df['CCCRRRAAA'].isin(Regions))]
-            df_baseline = df['value'].sum()
+            df_baseline = df['value'].sum() / 100
         else :
             df_baseline = df.iloc[0]['value']
         
         # Sample the data
-        df = df_baseline * self.df_scenarios_sample[selection] #Natural gas price all scenarios
+        df = df_baseline * self.df_scenarios_sample[selection] 
         df.index = df.index + 1
         df.loc[0] = df_baseline
         df = df.sort_index().reset_index(drop=True)
@@ -317,30 +349,33 @@ class MainResults_GSA:
     ### ------------------------------- ###
     
     # Plot the violin plot of a specific information, for specific countries, on a specific year
-    def violin_plot(self, selection: str, Countries: Union[list[str], dict], YEAR: int,
+    def violin_plot(self, selection: Union[str,dict], Countries: Union[list[str], dict], YEAR: int,
                     model_filter: list[str] = None, show_baseline = False) -> go.Figure:
         
-        # Color of the violin plots
-        if selection in ["H2 Green Capacity", "H2 Green Production"]:
-            color = 'green'
-        elif selection in ["H2 Blue Capacity", "H2 Blue Production"]:
-            color = 'blue'
-        elif selection in ["H2 Storage", "H2 Import Capacity", "H2 Import Production"]:
-            color = 'orange'
-            unit = 'TWh'
-        elif selection in ["H2 Transmission Capacity"]:
-            color = 'red'
-        elif selection in ["H2 Transmission Flow"]:
-            color = 'red'
-        # Unit of the violin plots
-        if "Capacity" in selection:
-            unit = 'GW'
-        elif "Production" in selection or "Flow" in selection:
-            unit = 'TWh'
+        if type(selection) == dict:
+            selection_keys = list(selection.keys())
+            column_widths = []
+            total_width = 0
+            for key in selection_keys:
+                if type(selection[key]) != list:
+                    raise ValueError("The values of the selection dictionnary should be lists.")
+                column_widths.append(len(selection[key]))
+                total_width += len(selection[key])
+            column_widths = [width/total_width for width in column_widths]
+            fig = make_subplots(rows=1, cols=len(selection_keys), column_widths=column_widths)
+            name_included = " & ".join(selection_keys)
+            title=f'Value distribution of {name_included} ({YEAR})'
+        else:
+            fig = make_subplots(rows=1, cols=1)
+            # Construct dict for plotting
+            if "Capacity" in selection:
+                unit = 'GW'
+            elif "Production" in selection or "Flow" in selection:
+                unit = 'TWh'
+            title=f'Value Distribution of {selection} ({YEAR})'
+            selection = {f"{selection} [{unit}]": [selection]}
+            selection_keys = list(selection.keys())
             
-        # Create plot
-        fig = go.Figure()
-        
         # Iterate over the countries if defined as a dictionnary
         if type(Countries) == list :
             if len(Countries) == 0:
@@ -350,64 +385,62 @@ class MainResults_GSA:
             else :
                 Countries = {f"{len(Countries)} countries" : Countries}   
         
-        for country in Countries.keys():
-            # Filter the models we want to plot
-            if model_filter is not None:
-                for model_name in model_filter:
-                    if model_name not in self.model_names:
-                        raise ValueError(f"The model {model_name} is not in the list of models.")
-                self.model_names = model_filter
-                self.nb_models = len(model_filter)
-            # Iterate over the model names
-            for model in self.model_names:
-                # Choose name adequatly
-                model_name = model # Name to be put on the graph
-                if len(Countries.keys()) != 1:
-                    violin_name = f"{model_name} {country}"
-                else:
-                    violin_name = model_name
-                
-                try :
-                    # Get the data
-                    df = self.get_results(model, selection, Countries[country], YEAR)
-                    ### For now we don't deal with the case where we look at different countries to import transmission data
-                    df = df.groupby('Scenarios')['value'].sum().reset_index()
-                    # Extract the baseline value
-                    if show_baseline:
-                        baseline = df[df['Scenarios'] == 0]['value'].values[0]
-                    df = df[df['Scenarios'] != 0]
-                    # Plot the data
-                    fig.add_trace(go.Violin(y=df['value'], name=violin_name,
-                                            box_visible=True, line_color=color))
-                    if show_baseline:
-                        fig.add_trace(go.Scatter(x=[violin_name], y=[baseline], mode='markers',
-                                                marker=dict(color='#3C3D37', size=10), name=violin_name + ' Baseline'))
-                except :
-                    print(f"No {selection} data for {model_name} - {country}")
-                
+        for column, key in enumerate(selection_keys, start=1):
+            for select in selection[key]:
+                # Color of the violin plots
+                color = results_color[select]
+                # Iterate over the countries
+                for country in Countries.keys():
+                    # Filter the models we want to plot
+                    if model_filter is not None:
+                        for model_name in model_filter:
+                            if model_name not in self.model_names:
+                                raise ValueError(f"The model {model_name} is not in the list of models.")
+                        self.model_names = model_filter
+                        self.nb_models = len(model_filter)
+                    # Iterate over the model names
+                    for model in self.model_names:
+                        # Choose name adequatly
+                        model_name = model # Name of the model to be put on the graph
+                        if len(Countries.keys()) != 1: # If we put more than one geography, we add the name
+                            violin_name = f"{model_name} {country}"
+                        else:
+                            violin_name = model_name
+                        select_name = select
+                        if len(selection[key]) != 1 or sum([len(selection[key]) for key in selection_keys]) != len(selection_keys):
+                            violin_name = f"{select}<br>{violin_name}" 
+                        
+                        try :
+                            # Get the data
+                            df = self.get_results(model, select, Countries[country], YEAR)
+                            ### For now we don't deal with the case where we look at different countries to import transmission data
+                            df = df.groupby('Scenarios')['value'].sum().reset_index()
+                            # Extract the baseline value
+                            if show_baseline:
+                                baseline = df[df['Scenarios'] == 0]['value'].values[0]
+                            df = df[df['Scenarios'] != 0]
+                            # Plot the data
+                            fig.add_trace(go.Violin(y=df['value'], name=violin_name, box_visible=True, line_color=color), row=1, col=column)
+                            if show_baseline:
+                                fig.add_trace(go.Scatter(x=[violin_name], y=[baseline], mode='markers',
+                                                        marker=dict(color='#3C3D37', size=10), name=violin_name + ' Baseline'), row=1, col=column)
+                        except :
+                            print(f"No {selection} data for {model_name} - {country}")   
+                                                           
+            fig.update_yaxes(title_text=f"{key}", range=[0, None], showgrid=True, gridcolor='black', gridwidth=1,
+                             tickfont=dict(size=16), title_font=dict(size=16), row=1, col=column)
+            fig.update_xaxes(tickangle=0, row=1, col=column)    
             
         fig.update_layout(
             title={
-                'text': f'Violin Plot: Value Distribution of {selection} ({YEAR})',
+                'text': title,
                 'font': {'size': 16}
             },
-            yaxis_title=f"{selection} [{unit}]",
-            yaxis_range=[0, None],
             height=600,
-            width=200*self.nb_models*len(Countries),
+            width=max(600,200*self.nb_models*len(Countries)*sum([len(selection[key]) for key in selection_keys])),
             legend=dict(orientation='h', x=0.5, y=1.04, xanchor='center', yanchor='bottom'),  # Adjust legend position
-            margin=dict(t=150, b=50),  # Adjust top and bottom margins to accommodate title and legend
+            margin=dict(t=150, b=150),  # Adjust top and bottom margins to accommodate title and legend
             plot_bgcolor='white',  # Set background color to white
-            xaxis=dict(
-                tickfont=dict(size=15)  # Set font size for x-axis title
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridcolor='black',
-                gridwidth=1,
-                tickfont=dict(size=16),
-                title_font=dict(size=16)
-            )
         )
             
         return fig
@@ -423,7 +456,7 @@ class MainResults_GSA:
         x_selection = selection[0]
         if x_selection in input_data_selections:
             df_x = self.sample_input_data(x_selection, Countries, YEAR)
-            x_unit = ""
+            x_unit = input_data_unit[x_selection]
         elif x_selection in results_selections:
             df_x = self.get_results(model, x_selection, Countries, YEAR)
             if "Capacity" in x_selection:
@@ -434,7 +467,7 @@ class MainResults_GSA:
         y_selection = selection[1]
         if y_selection in input_data_selections:
             df_y = self.sample_input_data(y_selection, Countries, YEAR)
-            y_unit = ""
+            y_unit = input_data_unit[y_selection]
         elif y_selection in results_selections:
             df_y = self.get_results(model, y_selection, Countries, YEAR)
             if "Capacity" in y_selection:
