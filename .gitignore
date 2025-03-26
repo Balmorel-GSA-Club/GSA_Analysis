@@ -1,4 +1,5 @@
 DATA/*
 !DATA/.gitkeep
 Monte_Carlo_Simulation/Analysis/*
+Monte_Carlo_Simulation/OLD/*
 **/__pycache__/
