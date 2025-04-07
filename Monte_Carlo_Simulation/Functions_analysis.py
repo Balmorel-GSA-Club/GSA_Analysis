@@ -259,10 +259,12 @@ class MainResults_GSA:
         if selection in ["Elec RE Capacity","Elec PV Capacity", "Elec ONSHORE Capacity", "Elec OFFSHORE Capacity",
                          "Elec RE Production","Elec PV Production", "Elec ONSHORE Production", "Elec OFFSHORE Production"]:
             df = df[df['COMMODITY']=='ELECTRICITY']
-        if selection in ["H2 Green Capacity", "H2 Blue Capacity", "H2 Green Production", "H2 Blue Production", "H2 Storage"]:
-            df = df[(df['COMMODITY']=='HYDROGEN') & (df['FFF'] != 'IMPORT_H2')]
+        elif selection in ["H2 Green Capacity", "H2 Blue Capacity", "H2 Green Production", "H2 Blue Production"]:
+            df = df[(df['COMMODITY']=='HYDROGEN') & (df['FFF'] != 'IMPORT_H2') & (df['TECH_TYPE'] != 'H2-STORAGE')]
         elif selection in ["H2 Import Capacity", "H2 Import Production"]:
             df = df[(df['COMMODITY']=='HYDROGEN') & (df['FFF'] == 'IMPORT_H2')]
+        elif selection in ["H2 Storage"]:
+            df = df[(df['COMMODITY']=='HYDROGEN')]
         
         # Tech type filtering
         if selection in ["Elec RE Capacity","Elec RE Production"]:
