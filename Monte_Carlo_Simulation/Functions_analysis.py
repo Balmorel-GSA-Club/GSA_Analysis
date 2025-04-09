@@ -39,7 +39,8 @@ RRR_to_CCC = {
 
 Parameters_names = [ "CO2_TAX","CO2_EFF","ELYS_ELEC_EFF","H2S_INVC","SMR_CCS_INVC","PV_INVC","ONS_WT_INVC","H2_OandM","SMR_CCS_OandM","H2_TRANS_INVC","ELEC_TRANS_INVC",
                     "IMPORT_H2_P","DH2_DEMAND_EAST","DH2_DEMAND_SOUTH","DH2_DEMAND_NORTH","DH2_DEMAND_WEST",
-                    "DE_DEMAND_EAST","DE_DEMAND_SOUTH","DE_DEMAND_NORTH","DE_DEMAND_WEST","PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST",
+                    "DE_DEMAND_EAST","DE_DEMAND_SOUTH","DE_DEMAND_NORTH","DE_DEMAND_WEST",
+                    "PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST",
                     "ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH",
                     "TRANS_DEMAND_NORTH","TRANS_DEMAND_SOUTH", "TRANS_DEMAND_EAST", "TRANS_DEMAND_WEST", "NATGAS_P" ]
 
@@ -62,14 +63,28 @@ results_unit = {"Elec RE Capacity":"GW","Elec PV Capacity":"GW", "Elec ONSHORE C
                 "H2 Transmission Capacity":"GW", "H2 Transmission Flow":"TWh"}
 
 input_data_selections = ["NATGAS_P", "CO2_TAX", "SMR_CCS_INVC", "PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST",
-                         "ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH"]
+                         "ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH",
+                         "OFF_LIMIT_EAST","OFF_LIMIT_WEST","OFF_LIMIT_NORTH","OFF_LIMIT_SOUTH",]
 
 input_data_geography = {"PV_LIMIT_NORTH":EU_North,"PV_LIMIT_SOUTH":EU_South,"PV_LIMIT_EAST":EU_East,"PV_LIMIT_WEST":EU_West,
-                        "ONS_LIMIT_EAST":EU_East,"ONS_LIMIT_WEST":EU_West,"ONS_LIMIT_NORTH":EU_North,"ONS_LIMIT_SOUTH":EU_South}
+                        "ONS_LIMIT_EAST":EU_East,"ONS_LIMIT_WEST":EU_West,"ONS_LIMIT_NORTH":EU_North,"ONS_LIMIT_SOUTH":EU_South,
+                        "OFF_LIMIT_EAST":EU_East,"OFF_LIMIT_WEST":EU_West,"OFF_LIMIT_NORTH":EU_North,"OFF_LIMIT_SOUTH":EU_South,}
 
 input_data_unit = {"NATGAS_P":"€/GJ", "CO2_TAX":"€/tCO2", "SMR_CCS_INVC":"€/MW", 
                    "PV_LIMIT_NORTH":"GW", "PV_LIMIT_SOUTH":"GW", "PV_LIMIT_EAST":"GW", "PV_LIMIT_WEST":"GW",
-                   "ONS_LIMIT_EAST":"GW", "ONS_LIMIT_WEST":"GW", "ONS_LIMIT_NORTH":"GW", "ONS_LIMIT_SOUTH":"GW"}
+                   "ONS_LIMIT_EAST":"GW", "ONS_LIMIT_WEST":"GW", "ONS_LIMIT_NORTH":"GW", "ONS_LIMIT_SOUTH":"GW",
+                   "OFF_LIMIT_EAST":"GW", "OFF_LIMIT_WEST":"GW", "OFF_LIMIT_NORTH":"GW", "OFF_LIMIT_SOUTH":"GW",}
+
+results_and_input_data_selections = ["PV_POT_NORTH","PV_POT_SOUTH","PV_POT_EAST","PV_POT_WEST",
+                                     "ONS_POT_EAST","ONS_POT_WEST","ONS_POT_NORTH","ONS_POT_SOUTH",
+                                     "OFF_POT_EAST","OFF_POT_WEST","OFF_POT_NORTH","OFF_POT_SOUTH"]
+
+results_and_input_data_selections_dict = {"PV_POT_NORTH": ["Elec PV Capacity", "PV_LIMIT_NORTH"], "PV_POT_SOUTH": ["Elec PV Capacity", "PV_LIMIT_SOUTH"],
+                                          "PV_POT_EAST": ["Elec PV Capacity", "PV_LIMIT_EAST"], "PV_POT_WEST": ["Elec PV Capacity", "PV_LIMIT_WEST"],
+                                          "ONS_POT_EAST": ["Elec ONSHORE Capacity", "ONS_LIMIT_EAST"], "ONS_POT_WEST": ["Elec ONSHORE Capacity", "ONS_LIMIT_WEST"],
+                                          "ONS_POT_NORTH": ["Elec ONSHORE Capacity", "ONS_LIMIT_NORTH"], "ONS_POT_SOUTH": ["Elec ONSHORE Capacity", "ONS_LIMIT_SOUTH"],
+                                          "OFF_POT_EAST": ["Elec OFFSHORE Capacity", "OFF_LIMIT_EAST"], "OFF_POT_WEST": ["Elec OFFSHORE Capacity", "OFF_LIMIT_WEST"],
+                                          "OFF_POT_NORTH": ["Elec OFFSHORE Capacity", "OFF_LIMIT_NORTH"], "OFF_POT_SOUTH": ["Elec OFFSHORE Capacity", "OFF_LIMIT_SOUTH"]}
 
 #%% ------------------------------- ###
 ###            1. Class             ###
@@ -322,7 +337,9 @@ class MainResults_GSA:
             df = df[(df['GGG'].str.contains("GNR_STEAM-REFORMING-CCS")) & (df['GDATASET']=='GDINVCOST0')] 
             
         # KPOT of the subtechnology group
-        if selection in ["PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST","ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH"]:
+        if selection in ["PV_LIMIT_NORTH","PV_LIMIT_SOUTH","PV_LIMIT_EAST","PV_LIMIT_WEST",
+                         "ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH",
+                         "OFF_LIMIT_EAST","OFF_LIMIT_WEST","OFF_LIMIT_NORTH","OFF_LIMIT_SOUTH"]:
             print("You have selected a geography dependant input data. The correct geography has been selected.")
             Geography = input_data_geography[selection]
             Regions = [key for key, value in RRR_to_CCC.items() if value in Geography] # To get the regions associated to the countries
@@ -331,12 +348,18 @@ class MainResults_GSA:
                 df = df[(df["TECH_GROUP"]=="SOLARPV") & (df['CCCRRRAAA'].isin(Regions))]
             elif selection in ["ONS_LIMIT_EAST","ONS_LIMIT_WEST","ONS_LIMIT_NORTH","ONS_LIMIT_SOUTH"]:
                 df = df[(df["TECH_GROUP"]=="WINDTURBINE_ONSHORE") & (df['CCCRRRAAA'].isin(Regions))]
-            df_baseline = df['value'].sum() / 100
+            elif selection in ["OFF_LIMIT_EAST","OFF_LIMIT_WEST","OFF_LIMIT_NORTH","OFF_LIMIT_SOUTH"]:
+                df = df[(df["TECH_GROUP"]=="WINDTURBINE_OFFSHORE") & (df['CCCRRRAAA'].isin(Regions))]
+            df_baseline = df['value'].sum() / 1000
         else :
             df_baseline = df.iloc[0]['value']
         
         # Sample the data
-        df = df_baseline * self.df_scenarios_sample[selection] 
+        if selection in self.df_scenarios_sample.columns:
+            df = df_baseline * self.df_scenarios_sample[selection] 
+        else :
+            df = pd.Series(df_baseline, index=self.df_scenarios_sample.index)
+            print("Your selection is not one of the changing parameter in the GSA. The baseline value has been used for all scenarios.")
         df.index = df.index + 1
         df.loc[0] = df_baseline
         df = df.sort_index().reset_index(drop=True)
@@ -465,6 +488,12 @@ class MainResults_GSA:
                 x_unit = 'GW'
             elif "Production" in x_selection or "Flow" in x_selection:
                 x_unit = 'TWh'
+        elif x_selection in results_and_input_data_selections :
+            df_x_results = self.get_results(model, results_and_input_data_selections_dict[x_selection][0], Countries, YEAR)
+            df_x_input = self.sample_input_data(results_and_input_data_selections_dict[x_selection][1], Countries, YEAR)
+            df_x = pd.merge(df_x_results, df_x_input, on='Scenarios', suffixes=('_results', '_input'))
+            df_x['value'] = df_x['value_results'] / df_x['value_input']
+            x_unit = '%'
         
         y_selection = selection[1]
         if y_selection in input_data_selections:
@@ -476,17 +505,29 @@ class MainResults_GSA:
                 y_unit = 'GW'
             elif "Production" in y_selection or "Flow" in y_selection:
                 y_unit = 'TWh'
+        elif y_selection in results_and_input_data_selections :
+            df_y_results = self.get_results(model, results_and_input_data_selections_dict[y_selection][0], Countries, YEAR)
+            df_y_input = self.sample_input_data(results_and_input_data_selections_dict[y_selection][1], Countries, YEAR)
+            df_y = pd.merge(df_y_results, df_y_input, on='Scenarios', suffixes=('_results', '_input'))
+            df_y['value'] = df_y['value_results'] / df_y['value_input']
+            y_unit = '%'
                 
         if color_selection is not None:
             if color_selection in input_data_selections:
                 df_color = self.sample_input_data(color_selection, Countries, YEAR)
-                color_unit = ""
+                color_unit = input_data_unit[color_selection]
             elif color_selection in results_selections:
                 df_color = self.get_results(model, color_selection, Countries, YEAR)
                 if "Capacity" in color_selection:
                     color_unit = 'GW'
                 elif "Production" in color_selection or "Flow" in color_selection:
                     color_unit = 'TWh'
+            elif color_selection in results_and_input_data_selections :
+                df_color_results = self.get_results(model, results_and_input_data_selections_dict[color_selection][0], Countries, YEAR)
+                df_color_input = self.sample_input_data(results_and_input_data_selections_dict[color_selection][1], Countries, YEAR)
+                df_color = pd.merge(df_color_results, df_color_input, on='Scenarios', suffixes=('_results', '_input'))
+                df_color['value'] = df_color['value_results'] / df_color['value_input']
+                color_unit = '%'
         
         # Extract the baseline value
         if show_baseline:
