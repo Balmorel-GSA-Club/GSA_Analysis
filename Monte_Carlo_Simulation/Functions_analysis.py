@@ -528,6 +528,7 @@ class MainResults_GSA:
                 df_color = pd.merge(df_color_results, df_color_input, on='Scenarios', suffixes=('_results', '_input'))
                 df_color['value'] = df_color['value_results'] / df_color['value_input']
                 color_unit = '%'
+            df_color = df_color[df_color['Scenarios'] != 0]
         
         # Extract the baseline value
         if show_baseline:
