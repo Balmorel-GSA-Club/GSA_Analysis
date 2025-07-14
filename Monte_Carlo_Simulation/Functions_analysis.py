@@ -464,7 +464,7 @@ class MainResults_GSA:
             height=600,
             width=max(600,200*self.nb_models*len(Countries)*sum([len(selection[key]) for key in selection_keys])),
             legend=dict(orientation='h', x=0.5, y=1.04, xanchor='center', yanchor='bottom'),  # Adjust legend position
-            margin=dict(t=150, b=150),  # Adjust top and bottom margins to accommodate title and legend
+            margin=dict(t=200, b=150),  # Adjust top and bottom margins to accommodate title and legend
             plot_bgcolor='white',  # Set background color to white
         )
             
